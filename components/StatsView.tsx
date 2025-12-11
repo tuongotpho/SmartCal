@@ -92,15 +92,15 @@ const StatsView: React.FC<StatsViewProps> = ({ currentDate, tasks, tags }) => {
   }, [monthStats]);
 
   return (
-    <div className="flex flex-col h-full bg-orange-50 dark:bg-gray-900 rounded-lg overflow-y-auto p-3 lg:p-4 gap-4 animate-in fade-in duration-300 pb-32 lg:pb-0">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-full bg-orange-50 dark:bg-gray-900 rounded-lg overflow-y-auto p-3 lg:p-4 gap-4 animate-in fade-in duration-300 pb-32 lg:pb-0 custom-scrollbar">
+      <div className="flex items-center justify-between flex-shrink-0">
          <h2 className="text-lg lg:text-xl font-bold text-orange-800 dark:text-orange-400 flex items-center gap-2">
            <TrendingUp className="text-orange-600 dark:text-orange-500" /> Thống kê Tháng {format(currentDate, 'MM/yyyy')}
          </h2>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-shrink-0">
         <div className="bg-white dark:bg-gray-800 p-3 lg:p-4 rounded-xl shadow-sm border border-orange-100 dark:border-gray-700 flex flex-row sm:flex-col items-center justify-between sm:justify-center">
           <div className="text-gray-500 dark:text-gray-400 text-xs font-semibold uppercase mb-0 sm:mb-1">Tổng việc</div>
           <div className="text-2xl lg:text-3xl font-bold text-gray-800 dark:text-gray-100">{monthStats.total}</div>
@@ -124,59 +124,64 @@ const StatsView: React.FC<StatsViewProps> = ({ currentDate, tasks, tags }) => {
         </div>
       </div>
 
-      {/* Main Chart Section */}
-      <div className="flex flex-col md:flex-row gap-4 flex-1 min-h-[300px]">
-        {/* Chart Area */}
-        <div className="flex-1 bg-white dark:bg-gray-800 p-4 lg:p-6 rounded-xl shadow-sm border border-orange-100 dark:border-gray-700 flex flex-col items-center justify-center relative min-h-[250px]">
-          <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 absolute top-4 left-4 flex items-center gap-2">
+      {/* Main Content Area - Flex Column on Mobile, Row on Desktop */}
+      <div className="flex flex-col md:flex-row gap-4 shrink-0">
+        
+        {/* Chart Card */}
+        <div className="flex-1 bg-white dark:bg-gray-800 p-4 lg:p-6 rounded-xl shadow-sm border border-orange-100 dark:border-gray-700 flex flex-col h-auto">
+          <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2 mb-6">
             <PieChart size={16} className="text-orange-500"/> Phân bổ theo Thẻ
           </h3>
           
-          {monthStats.total === 0 ? (
-            <div className="text-center text-gray-400 flex flex-col items-center">
-               <AlertCircle size={48} className="mb-2 opacity-50"/>
-               <p>Chưa có dữ liệu trong tháng này.</p>
-            </div>
-          ) : (
-            <div className="flex items-center gap-8 flex-wrap justify-center mt-6 md:mt-0">
-              {/* Donut Chart */}
-              <div 
-                className="w-40 h-40 lg:w-48 lg:h-48 rounded-full shadow-inner relative transition-all hover:scale-105 duration-300"
-                style={{ background: gradientString }}
-              >
-                {/* Inner White Circle to make it a Donut */}
-                <div className="absolute inset-4 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center flex-col shadow-sm">
-                   <span className="text-2xl lg:text-3xl font-bold text-gray-700 dark:text-gray-200">{monthStats.total}</span>
-                   <span className="text-[10px] text-gray-400 uppercase">Task</span>
+          <div className="flex flex-col md:flex-row items-center justify-center gap-6 w-full h-full">
+            {monthStats.total === 0 ? (
+              <div className="text-center text-gray-400 flex flex-col items-center py-8">
+                 <AlertCircle size={48} className="mb-2 opacity-50"/>
+                 <p>Chưa có dữ liệu trong tháng này.</p>
+              </div>
+            ) : (
+              <>
+                {/* Donut Chart */}
+                <div 
+                  className="w-40 h-40 lg:w-48 lg:h-48 rounded-full shadow-inner relative transition-all hover:scale-105 duration-300 shrink-0"
+                  style={{ background: gradientString }}
+                >
+                  {/* Inner White Circle */}
+                  <div className="absolute inset-4 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center flex-col shadow-sm">
+                     <span className="text-2xl lg:text-3xl font-bold text-gray-700 dark:text-gray-200">{monthStats.total}</span>
+                     <span className="text-[10px] text-gray-400 uppercase">Task</span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Legend */}
-              <div className="flex flex-col gap-2 min-w-[150px]">
-                 {monthStats.chartData.map((item, idx) => (
-                   <div key={idx} className="flex items-center justify-between text-sm group">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-3 h-3 rounded-full ${item.tailwindDot}`}></span>
-                        <span className="text-gray-700 dark:text-gray-300 font-medium group-hover:text-orange-600 transition">{item.name}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                         <span className="font-bold text-gray-800 dark:text-gray-200">{item.count}</span>
-                         <span className="text-xs text-gray-400 w-8 text-right">{Math.round(item.percentage)}%</span>
-                      </div>
+                {/* Legend - With max-height scroll on mobile */}
+                <div className="w-full md:w-auto min-w-[180px] max-h-56 md:max-h-none overflow-y-auto custom-scrollbar pr-1">
+                   <div className="flex flex-col gap-2">
+                     {monthStats.chartData.map((item, idx) => (
+                       <div key={idx} className="flex items-center justify-between text-sm group p-1.5 hover:bg-orange-50 dark:hover:bg-gray-700/50 rounded transition border-b border-gray-50 dark:border-gray-700/50 last:border-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`w-3 h-3 rounded-full ${item.tailwindDot} shrink-0`}></span>
+                            <span className="text-gray-700 dark:text-gray-300 font-medium truncate">{item.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                             <span className="font-bold text-gray-800 dark:text-gray-200">{item.count}</span>
+                             <span className="text-xs text-gray-400 w-8 text-right">{Math.round(item.percentage)}%</span>
+                          </div>
+                       </div>
+                     ))}
                    </div>
-                 ))}
-              </div>
-            </div>
-          )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
         
-        {/* Monthly Goals / Insights */}
-        <div className="md:w-1/3 bg-white dark:bg-gray-800 p-4 lg:p-5 rounded-xl shadow-sm border border-orange-100 dark:border-gray-700 flex flex-col">
+        {/* Monthly Goals / Insights Card */}
+        <div className="md:w-1/3 bg-white dark:bg-gray-800 p-4 lg:p-5 rounded-xl shadow-sm border border-orange-100 dark:border-gray-700 flex flex-col h-auto">
            <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
              <Target size={16} className="text-red-500"/> Mục tiêu & Xu hướng
            </h3>
            
-           <div className="space-y-4 flex-1">
+           <div className="space-y-4">
               <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-100 dark:border-red-900/30">
                  <div className="text-xs text-red-600 dark:text-red-400 font-bold mb-1">Công việc chưa xong</div>
                  <div className="text-xl font-bold text-red-700 dark:text-red-300 flex items-center gap-2">

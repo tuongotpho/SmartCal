@@ -11,30 +11,20 @@ import {
   endOfWeek, 
   isWithinInterval, 
   endOfMonth, 
-  getWeek, 
-  isToday, 
-  isTomorrow, 
-  isBefore, 
-  isAfter, 
-  startOfDay, 
-  compareAsc, 
-  differenceInDays, 
-  add,
-  startOfMonth,
   startOfWeek,
-  parse,
-  isValid
+  startOfMonth,
+  isValid,
+  startOfDay
 } from 'date-fns';
 import { 
   Settings, 
-  HelpCircle, 
   ChevronLeft, 
   ChevronRight, 
+  ChevronDown,
   RefreshCw, 
   Sparkles, 
   Bot, 
   CalendarPlus, 
-  CloudOff, 
   WifiOff, 
   Edit3, 
   Repeat, 
@@ -45,18 +35,11 @@ import {
   MicOff, 
   BarChart3, 
   PieChart, 
-  ListChecks, 
   LayoutGrid, 
   Columns, 
   Square, 
   Trash2, 
-  CalendarDays, 
-  Clock, 
-  ArrowRight, 
-  AlertCircle, 
-  Menu, 
-  Filter, 
-  ChevronDown, 
+  Calendar, 
   Layout, 
   X, 
   Plus,
@@ -65,11 +48,8 @@ import {
   LogOut,
   User,
   PenLine,
-  Keyboard,
-  Calendar,
-  Tag as TagIcon,
-  AlignLeft,
-  History
+  History,
+  Timer
 } from 'lucide-react';
 import CalendarView from './components/CalendarView';
 import StatsView from './components/StatsView';
@@ -142,6 +122,7 @@ const App: React.FC = () => {
     date: format(new Date(), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd'),
     time: '08:00',
+    duration: '',
     tag: 'Khác',
     recurringType: 'none' as RecurringType,
     description: '',
@@ -488,6 +469,7 @@ const App: React.FC = () => {
           title: newTask.title,
           date: newTask.date,
           time: newTask.time,
+          duration: newTask.duration || "",
           description: newTask.description,
           completed: newTask.completed,
           reminderSent: false,
@@ -508,6 +490,17 @@ const App: React.FC = () => {
 
     if (syncTelegram && telegramConfig.botToken) {
       sendTelegramMessage(telegramConfig, formatTaskForTelegram(newTask));
+    }
+  };
+
+  // --- Wrapper xử lý Save từ Modal (Fix lỗi không thêm mới được từ Mobile) ---
+  const handleSaveTaskFromModal = async (taskToSave: Task) => {
+    if (taskToSave.id === 'temp') {
+       // Nếu là task mới (ID là temp), gọi hàm thêm mới
+       await handleAddTask(taskToSave);
+    } else {
+       // Nếu là task cũ, gọi hàm cập nhật
+       await handleUpdateTask(taskToSave);
     }
   };
 
@@ -560,6 +553,7 @@ const App: React.FC = () => {
       title: "",
       date: targetDate,
       time: format(now, "HH:mm"),
+      duration: "",
       description: "",
       completed: false,
       reminderSent: false,
@@ -608,6 +602,7 @@ const App: React.FC = () => {
       date: manualForm.date,
       endDate: manualForm.endDate || manualForm.date,
       time: manualForm.time || "08:00",
+      duration: manualForm.duration.trim(),
       description: manualForm.description.trim() || "Tạo thủ công",
       completed: false,
       reminderSent: false,
@@ -623,7 +618,8 @@ const App: React.FC = () => {
         ...manualForm, 
         title: '', 
         description: '', 
-        checklistText: '' 
+        checklistText: '',
+        duration: ''
     }); 
     showToast("Đã tạo công việc!", "success");
   };
@@ -718,7 +714,7 @@ const App: React.FC = () => {
 
     try {
         const apiKey = localStorage.getItem('gemini_api_key');
-        let taskData: { title: string; date: string; time: string; description?: string; tag?: string } | null = null;
+        let taskData: { title: string; date: string; time: string; duration?: string; description?: string; tag?: string } | null = null;
         let method = 'manual';
 
         // 1. Ưu tiên dùng AI nếu có Key
@@ -754,6 +750,7 @@ const App: React.FC = () => {
                 title: taskData.title,
                 date: taskData.date,
                 time: taskData.time,
+                duration: taskData.duration || "",
                 description: taskData.description || (method === 'ai' ? "Tạo tự động bởi AI" : "Tạo nhanh"),
                 completed: false,
                 reminderSent: false,
@@ -860,6 +857,7 @@ const App: React.FC = () => {
               title: result.title,
               date: result.date,
               time: result.time,
+              duration: result.duration || "",
               description: `Đồng bộ từ Telegram: "${msg}"`,
               completed: false,
               reminderSent: false,
@@ -980,6 +978,11 @@ const App: React.FC = () => {
                     <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openEditModal(task)}>
                     <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{task.time}</span>
+                        {task.duration && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 flex items-center gap-0.5 border border-blue-100 dark:border-blue-800">
+                             <Timer size={10} /> {task.duration}
+                          </span>
+                        )}
                         <span className={`text-xs font-bold px-2 py-0.5 rounded ${task.completed ? 'bg-gray-100 text-gray-500' : (tagConfig?.color || 'bg-gray-100 text-gray-700')}`}>
                             {task.date}
                             {isMultiDay && <span className="ml-1 opacity-70">→ {task.endDate}</span>}
@@ -1035,12 +1038,13 @@ const App: React.FC = () => {
                   </button>
                </div>
 
-               {/* 3 Column Grid */}
+               {/* 3 Column Grid - Optimized for Mobile (No container styles on mobile) */}
                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full overflow-y-auto lg:overflow-hidden p-1 custom-scrollbar">
                   
                   {/* Column 1: Past / Overdue */}
-                  <div className={`${mobileListTab === 'past' ? 'flex' : 'hidden'} lg:flex flex-col h-full bg-stone-50 dark:bg-stone-900/10 rounded-xl border border-stone-100 dark:border-stone-800 overflow-hidden mb-4 lg:mb-0`}>
-                      <div className="p-3 border-b border-stone-100 dark:border-stone-800 bg-stone-100/50 dark:bg-stone-900/30 flex justify-between items-center sticky top-0 z-10">
+                  <div className={`${mobileListTab === 'past' ? 'flex' : 'hidden'} lg:flex flex-col h-full lg:bg-stone-50 lg:dark:bg-stone-900/10 lg:rounded-xl lg:border lg:border-stone-100 lg:dark:border-stone-800 overflow-hidden lg:mb-0`}>
+                      {/* Header hidden on mobile */}
+                      <div className="hidden lg:flex p-3 border-b border-stone-100 dark:border-stone-800 bg-stone-100/50 dark:bg-stone-900/30 justify-between items-center sticky top-0 z-10">
                           <h3 className="font-bold text-stone-700 dark:text-stone-300 flex items-center gap-2 text-sm uppercase tracking-wide">
                               <History size={16} /> Việc cũ / Quá hạn
                           </h3>
@@ -1048,7 +1052,7 @@ const App: React.FC = () => {
                               {pastTasks.length}
                           </span>
                       </div>
-                      <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar min-h-[100px]">
+                      <div className="flex-1 overflow-y-auto p-1 lg:p-2 space-y-2 custom-scrollbar min-h-[100px]">
                           {pastTasks.length > 0 ? pastTasks.map(renderTaskCard) : (
                               <div className="flex flex-col items-center justify-center h-40 text-stone-300 dark:text-stone-800/50">
                                   <History size={40} className="mb-2 opacity-50"/>
@@ -1059,8 +1063,9 @@ const App: React.FC = () => {
                   </div>
 
                   {/* Column 2: Today */}
-                   <div className={`${mobileListTab === 'today' ? 'flex' : 'hidden'} lg:flex flex-col h-full bg-orange-50 dark:bg-orange-900/10 rounded-xl border border-orange-100 dark:border-orange-900/30 overflow-hidden mb-4 lg:mb-0`}>
-                      <div className="p-3 border-b border-orange-100 dark:border-orange-900/30 bg-orange-100/50 dark:bg-orange-900/30 flex justify-between items-center sticky top-0 z-10">
+                   <div className={`${mobileListTab === 'today' ? 'flex' : 'hidden'} lg:flex flex-col h-full lg:bg-orange-50 lg:dark:bg-orange-900/10 lg:rounded-xl lg:border lg:border-orange-100 lg:dark:border-orange-900/30 overflow-hidden lg:mb-0`}>
+                      {/* Header hidden on mobile */}
+                      <div className="hidden lg:flex p-3 border-b border-orange-100 dark:border-orange-900/30 bg-orange-100/50 dark:bg-orange-900/30 justify-between items-center sticky top-0 z-10">
                           <h3 className="font-bold text-orange-700 dark:text-orange-300 flex items-center gap-2 text-sm uppercase tracking-wide">
                               <Flame size={16} /> Việc hôm nay
                           </h3>
@@ -1068,7 +1073,7 @@ const App: React.FC = () => {
                               {todayTasks.length}
                           </span>
                       </div>
-                      <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar min-h-[100px]">
+                      <div className="flex-1 overflow-y-auto p-1 lg:p-2 space-y-2 custom-scrollbar min-h-[100px]">
                           {todayTasks.length > 0 ? todayTasks.map(renderTaskCard) : (
                                <div className="flex flex-col items-center justify-center h-40 text-orange-300 dark:text-orange-800/50">
                                   <CheckCircle2 size={40} className="mb-2 opacity-50"/>
@@ -1079,8 +1084,9 @@ const App: React.FC = () => {
                   </div>
 
                   {/* Column 3: Upcoming */}
-                   <div className={`${mobileListTab === 'upcoming' ? 'flex' : 'hidden'} lg:flex flex-col h-full bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/30 overflow-hidden mb-4 lg:mb-0`}>
-                      <div className="p-3 border-b border-blue-100 dark:border-blue-900/30 bg-blue-100/50 dark:bg-blue-900/30 flex justify-between items-center sticky top-0 z-10">
+                   <div className={`${mobileListTab === 'upcoming' ? 'flex' : 'hidden'} lg:flex flex-col h-full lg:bg-blue-50 lg:dark:bg-blue-900/10 lg:rounded-xl lg:border lg:border-blue-100 lg:dark:border-blue-900/30 overflow-hidden lg:mb-0`}>
+                      {/* Header hidden on mobile */}
+                      <div className="hidden lg:flex p-3 border-b border-blue-100 dark:border-blue-900/30 bg-blue-100/50 dark:bg-blue-900/30 justify-between items-center sticky top-0 z-10">
                           <h3 className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-2 text-sm uppercase tracking-wide">
                               <Calendar size={16} /> Việc sắp tới
                           </h3>
@@ -1088,7 +1094,7 @@ const App: React.FC = () => {
                               {upcomingTasks.length}
                           </span>
                       </div>
-                      <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar min-h-[100px]">
+                      <div className="flex-1 overflow-y-auto p-1 lg:p-2 space-y-2 custom-scrollbar min-h-[100px]">
                           {upcomingTasks.length > 0 ? upcomingTasks.map(renderTaskCard) : (
                                <div className="flex flex-col items-center justify-center h-40 text-blue-300 dark:text-blue-800/50">
                                   <Calendar size={40} className="mb-2 opacity-50"/>
@@ -1565,7 +1571,7 @@ const App: React.FC = () => {
         onClose={() => setIsEditModalOpen(false)} 
         task={editingTask} 
         tags={tags}
-        onSave={handleUpdateTask} 
+        onSave={handleSaveTaskFromModal} 
         showToast={showToast}
       />
       <ConfirmModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={executeDeleteTask} title="Xác nhận xóa" message="Bạn có chắc chắn muốn xóa công việc này không?" />

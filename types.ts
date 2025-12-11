@@ -20,6 +20,7 @@ export interface Task {
   date: string; // Format: YYYY-MM-DD (Ngày bắt đầu)
   endDate?: string; // Format: YYYY-MM-DD (Ngày kết thúc - New)
   time: string; // Format: HH:mm
+  duration?: string; // Thời lượng công việc (VD: 30p, 1h)
   description?: string;
   completed: boolean;
   reminderSent?: boolean;

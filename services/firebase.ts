@@ -27,7 +27,6 @@ export const auth = firebase.auth(app);
 export const googleProvider = new firebase.auth.GoogleAuthProvider();
 
 const COLLECTION_NAME = "tasks";
-// const CONFIG_COLLECTION = "config"; // Old global config
 const USERS_COLLECTION = "users";
 
 // --- AUTH ACTIONS ---
@@ -105,6 +104,7 @@ export const subscribeToTasks = (
         date: date,
         endDate: endDate,
         time: safeString(data.time) || "00:00",
+        duration: safeString(data.duration),
         description: safeString(data.description),
         completed: safeBoolean(data.completed),
         reminderSent: safeBoolean(data.reminderSent),
@@ -132,7 +132,6 @@ export const subscribeToTasks = (
 
 /**
  * Lắng nghe thay đổi Tag từ Firestore (User specific)
- * Path: users/{userId}/config/tags
  */
 export const subscribeToTags = (
   userId: string,
@@ -157,7 +156,6 @@ export const subscribeToTags = (
         callback(DEFAULT_TASK_TAGS);
       }
     } else {
-      // Nếu user chưa có config riêng, trả về default (không tự ghi đè để tiết kiệm write)
       callback(DEFAULT_TASK_TAGS);
     }
   }, (error: any) => {
@@ -169,12 +167,15 @@ export const subscribeToTags = (
 };
 
 /**
- * Lưu danh sách Tag lên Firestore (User specific)
+ * Lưu danh sách Tag lên Firestore
  */
 export const saveTagsToFirestore = async (userId: string, tags: Tag[]) => {
-  if (!userId) throw new Error("User not authenticated");
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Bạn chưa đăng nhập Firebase.");
+
   try {
-    const docRef = db.collection(USERS_COLLECTION).doc(userId).collection("config").doc("tags");
+    // Dùng currentUser.uid thay vì tham số userId để đảm bảo bảo mật
+    const docRef = db.collection(USERS_COLLECTION).doc(currentUser.uid).collection("config").doc("tags");
     
     const sanitizedTags = tags.map(t => ({
       name: t.name || "Thẻ mới",
@@ -191,20 +192,24 @@ export const saveTagsToFirestore = async (userId: string, tags: Tag[]) => {
 };
 
 /**
- * Thêm công việc mới vào Firestore (Có userId)
+ * Thêm công việc mới vào Firestore
  */
 export const addTaskToFirestore = async (task: Omit<Task, 'id'>) => {
-  if (!task.userId) {
-     console.warn("Attempted to add task without userId. Fallback to offline mode might happen.");
-     // Vẫn cho phép add nhưng sẽ không query lại được nếu bật rule security chặt
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+     console.warn("Lỗi: Không tìm thấy phiên đăng nhập khi thêm Task.");
+     throw new Error("User not authenticated");
   }
+
   try {
-    await db.collection(COLLECTION_NAME).add({
-      userId: task.userId, // Quan trọng: Lưu ID người dùng
+    // ÉP BUỘC userId phải là ID của người đang đăng nhập
+    const payload = {
+      userId: currentUser.uid, 
       title: task.title,
       date: task.date,
       endDate: task.endDate || task.date,
       time: task.time,
+      duration: task.duration || "",
       description: task.description || "",
       completed: task.completed,
       reminderSent: false,
@@ -212,10 +217,12 @@ export const addTaskToFirestore = async (task: Omit<Task, 'id'>) => {
       tag: task.tag || 'Khác',
       subtasks: task.subtasks || [],
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    };
+
+    await db.collection(COLLECTION_NAME).add(payload);
     return true;
-  } catch (e) {
-    console.warn("Fallback to offline: Could not add to Firestore", e);
+  } catch (e: any) {
+    console.warn("Lỗi khi thêm Task vào Firestore:", e.message);
     throw e;
   }
 };
@@ -224,18 +231,28 @@ export const addTaskToFirestore = async (task: Omit<Task, 'id'>) => {
  * Cập nhật công việc trong Firestore
  */
 export const updateTaskInFirestore = async (task: Task) => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("User not authenticated");
+
   try {
     const taskRef = db.collection(COLLECTION_NAME).doc(task.id);
-    const { id, isRecurring, ...dataToUpdate } = task; 
+    
+    // Loại bỏ các trường không cần thiết hoặc gây lỗi
+    const { id, isRecurring, userId, ...dataToUpdate } = task; 
+    
+    // Ép buộc userId trong data update phải khớp (hoặc không gửi userId để tránh ghi đè sai)
+    // Rule: resource.data.userId == request.auth.uid
+    // Ta chỉ update nội dung, không update userId (userId là bất biến)
     await taskRef.update({
         ...dataToUpdate,
         endDate: task.endDate || task.date,
         recurringType: task.recurringType || 'none',
+        duration: task.duration || "",
         subtasks: task.subtasks || []
     });
     return true;
-  } catch (e) {
-    console.warn("Fallback to offline: Could not update Firestore", e);
+  } catch (e: any) {
+    console.warn("Lỗi khi cập nhật Firestore:", e.message);
     throw e;
   }
 };

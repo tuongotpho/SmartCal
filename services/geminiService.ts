@@ -14,7 +14,7 @@ const getAiClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-export const parseTaskWithGemini = async (input: string, availableTags: string[]): Promise<{ title: string; date: string; endDate: string; time: string; description: string; recurringType: string; tag: string } | null> => {
+export const parseTaskWithGemini = async (input: string, availableTags: string[]): Promise<{ title: string; date: string; endDate: string; time: string; duration: string; description: string; recurringType: string; tag: string } | null> => {
   try {
     const ai = getAiClient();
     if (!ai) throw new Error("Vui lòng nhập API Key Gemini trong phần Cài đặt.");
@@ -39,6 +39,10 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
       - Nếu người dùng nói "từ ngày X đến ngày Y" hoặc "trong 3 ngày", hãy xác định endDate.
       - Nếu chỉ có 1 ngày, endDate = date.
       - Định dạng YYYY-MM-DD.
+      
+      Quy tắc thời lượng (duration):
+      - Nếu có thông tin về thời gian kéo dài (VD: "trong 30 phút", "1 tiếng", "1h30p"), hãy trích xuất vào duration (dạng text ngắn gọn).
+      - Nếu không có, để trống.
 
       Quy tắc phân loại Thẻ (tag):
       - Dựa vào nội dung để đoán 1 trong các thẻ sau: ${JSON.stringify(tagsToUse)}.
@@ -59,6 +63,7 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
             date: { type: Type.STRING, description: "Ngày bắt đầu YYYY-MM-DD" },
             endDate: { type: Type.STRING, description: "Ngày kết thúc YYYY-MM-DD (nếu không có thì bằng date)" },
             time: { type: Type.STRING, description: "Giờ diễn ra HH:mm (24h)" },
+            duration: { type: Type.STRING, description: "Thời lượng công việc (VD: 30p, 1h). Để trống nếu không có." },
             description: { type: Type.STRING, description: "Chi tiết công việc hoặc ghi chú thêm" },
             recurringType: { type: Type.STRING, enum: ['none', 'daily', 'weekly', 'monthly', 'yearly'], description: "Loại lặp lại" },
             tag: { type: Type.STRING, enum: tagsToUse, description: "Phân loại công việc" }
