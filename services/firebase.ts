@@ -40,6 +40,15 @@ export const signInWithGoogle = async () => {
   }
 };
 
+export const signInWithEmail = async (email: string, pass: string) => {
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+  } catch (error) {
+    console.error("Email Login failed", error);
+    throw error;
+  }
+};
+
 export const logOut = async () => {
   try {
     await auth.signOut();

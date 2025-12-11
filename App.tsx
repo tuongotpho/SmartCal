@@ -68,7 +68,8 @@ import {
   Keyboard,
   Calendar,
   Tag as TagIcon,
-  AlignLeft
+  AlignLeft,
+  History
 } from 'lucide-react';
 import CalendarView from './components/CalendarView';
 import StatsView from './components/StatsView';
@@ -103,6 +104,9 @@ const App: React.FC = () => {
   
   // Filter State
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
+
+  // Dashboard Mobile Tab State
+  const [mobileListTab, setMobileListTab] = useState<'past' | 'today' | 'upcoming'>('today');
 
   // Date Picker State
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -282,7 +286,11 @@ const App: React.FC = () => {
       unsubscribeTags = subscribeToTags(
         effectiveUserId,
         (fetchedTags) => {
-          setTags(fetchedTags);
+          // Chỉ setTags khi có dữ liệu trả về từ Firebase
+          // Nếu fetchedTags rỗng (do user mới), subscribeToTags đã handle trả về Default
+          if (fetchedTags && fetchedTags.length > 0) {
+             setTags(fetchedTags);
+          }
         },
         (error) => {
           console.warn("Không thể load tags từ Firebase, dùng LocalStorage fallback");
@@ -353,14 +361,21 @@ const App: React.FC = () => {
     
     if (useFirebase && user && !isOfflineMode) {
       try {
+        // user.uid is guaranteed by check above
         await saveTagsToFirestore(user.uid, newTags);
-        showToast("Đã lưu danh sách thẻ", "success");
+        showToast("Đã lưu danh sách thẻ vào Cloud", "success");
       } catch (e) {
         console.error("Lỗi lưu tags lên Firebase", e);
         showToast("Lỗi lưu thẻ lên Cloud", "error");
       }
     } else {
-      showToast("Đã lưu thẻ (Offline)", "success");
+      // Offline mode save
+      try {
+         localStorage.setItem('taskTags', JSON.stringify(newTags));
+         showToast("Đã lưu thẻ (Offline)", "success");
+      } catch(e) {
+         showToast("Lỗi lưu thẻ vào máy", "error");
+      }
     }
   }, [useFirebase, showToast, user, isOfflineMode]);
 
@@ -920,53 +935,170 @@ const App: React.FC = () => {
     }
 
     if (viewMode === ViewMode.LIST) {
-        // Sort by date descending
-        const sortedTasks = [...filteredTasks].sort((a, b) => {
-             const dateA = new Date(`${a.date}T${a.time}`);
-             const dateB = new Date(`${b.date}T${b.time}`);
-             return dateA.getTime() - dateB.getTime();
-        });
+        // Categorize Tasks for 3-Column View
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        
+        // 1. Past / Overdue (Ends before Today)
+        const pastTasks = filteredTasks
+            .filter(t => {
+                const end = t.endDate || t.date;
+                return end < todayStr;
+            })
+            .sort((a, b) => {
+                const dateCompare = a.date.localeCompare(b.date);
+                return dateCompare !== 0 ? dateCompare : a.time.localeCompare(b.time);
+            });
+
+        // 2. Today (Active Today: Start <= Today <= End)
+        const todayTasks = filteredTasks
+            .filter(t => {
+                const start = t.date;
+                const end = t.endDate || t.date;
+                return start <= todayStr && end >= todayStr;
+            })
+            .sort((a, b) => a.time.localeCompare(b.time));
+
+        // 3. Upcoming (Starts after Today)
+        const upcomingTasks = filteredTasks
+            .filter(t => t.date > todayStr)
+            .sort((a, b) => {
+                const dateCompare = a.date.localeCompare(b.date);
+                return dateCompare !== 0 ? dateCompare : a.time.localeCompare(b.time);
+            });
+
+        const renderTaskCard = (task: Task) => {
+            const tagConfig = tags.find(t => t.name === task.tag) || tags.find(t => t.name === 'Khác');
+            
+            // Check multi-day for label
+            const isMultiDay = task.endDate && task.endDate !== task.date;
+            
+            return (
+                <div key={task.id} className={`flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all group ${task.completed ? 'opacity-50 grayscale hover:opacity-100 hover:grayscale-0' : ''}`}>
+                    <button onClick={() => handleToggleComplete(task)} className={`flex-shrink-0 ${task.completed ? 'text-green-500' : 'text-gray-300 dark:text-gray-600 hover:text-green-500'}`}>
+                    {task.completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+                    </button>
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openEditModal(task)}>
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{task.time}</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${task.completed ? 'bg-gray-100 text-gray-500' : (tagConfig?.color || 'bg-gray-100 text-gray-700')}`}>
+                            {task.date}
+                            {isMultiDay && <span className="ml-1 opacity-70">→ {task.endDate}</span>}
+                        </span>
+                        {task.recurringType !== 'none' && <Repeat size={12} className="text-blue-500" />}
+                        <span className={`w-2 h-2 rounded-full ${tagConfig?.dot}`}></span>
+                    </div>
+                    {/* Updated: No line-through, just opacity applied to parent */}
+                    <h3 className={`font-semibold text-sm truncate text-gray-800 dark:text-gray-200`}>{task.title}</h3>
+                    {task.description && <p className="text-xs text-gray-500 truncate">{task.description}</p>}
+                    </div>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => openEditModal(task)} className="p-2 text-gray-400 hover:text-orange-500"><Edit3 size={16}/></button>
+                    <button onClick={() => handleDeleteTask(task.id)} className="p-2 text-gray-400 hover:text-red-500"><Trash2 size={16}/></button>
+                    </div>
+                </div>
+            );
+        };
 
         return (
-            <div className="flex flex-col h-full bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
-                <div className="p-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 flex justify-between items-center">
-                    <h2 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                        <Layout size={18} className="text-orange-500"/> Tất cả công việc
-                    </h2>
-                    <span className="text-xs text-gray-500">{sortedTasks.length} công việc</span>
-                </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-2 pb-32 lg:pb-0 custom-scrollbar">
-                    {sortedTasks.map(task => {
-                        const tagConfig = tags.find(t => t.name === task.tag) || tags.find(t => t.name === 'Khác');
-                        return (
-                        <div key={task.id} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all group">
-                             <button onClick={() => handleToggleComplete(task)} className={`flex-shrink-0 ${task.completed ? 'text-green-500' : 'text-gray-300 dark:text-gray-600 hover:text-green-500'}`}>
-                                {task.completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}
-                             </button>
-                             <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openEditModal(task)}>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{task.time}</span>
-                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${task.completed ? 'bg-gray-100 text-gray-500' : (tagConfig?.color || 'bg-gray-100 text-gray-700')}`}>
-                                        {task.date}
-                                    </span>
-                                    {task.recurringType !== 'none' && <Repeat size={12} className="text-blue-500" />}
-                                    <span className={`w-2 h-2 rounded-full ${tagConfig?.dot}`}></span>
-                                </div>
-                                <h3 className={`font-semibold text-sm truncate ${task.completed ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200'}`}>{task.title}</h3>
-                                {task.description && <p className="text-xs text-gray-500 truncate">{task.description}</p>}
-                             </div>
-                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => openEditModal(task)} className="p-2 text-gray-400 hover:text-orange-500"><Edit3 size={16}/></button>
-                                <button onClick={() => handleDeleteTask(task.id)} className="p-2 text-gray-400 hover:text-red-500"><Trash2 size={16}/></button>
-                             </div>
-                        </div>
-                    )})}
-                    {sortedTasks.length === 0 && (
-                        <div className="text-center py-10 text-gray-400">
-                            <p>Chưa có công việc nào.</p>
-                        </div>
-                    )}
-                </div>
+            <div className="flex flex-col h-full overflow-hidden pb-32 lg:pb-0">
+               {/* Mobile Tabs */}
+               <div className="lg:hidden flex gap-1 mb-2 bg-white dark:bg-gray-800 p-1 rounded-lg border border-orange-100 dark:border-gray-700 shadow-sm mx-1 mt-1 shrink-0">
+                  <button 
+                    onClick={() => setMobileListTab('past')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-md transition-all ${
+                      mobileListTab === 'past' 
+                        ? 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 shadow-sm ring-1 ring-stone-200 dark:ring-stone-700' 
+                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <History size={12}/> Việc cũ
+                  </button>
+                  <button 
+                    onClick={() => setMobileListTab('today')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-md transition-all ${
+                      mobileListTab === 'today' 
+                        ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 shadow-sm ring-1 ring-orange-200 dark:ring-orange-800' 
+                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <Flame size={12}/> Hôm nay
+                  </button>
+                  <button 
+                    onClick={() => setMobileListTab('upcoming')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-md transition-all ${
+                      mobileListTab === 'upcoming' 
+                        ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 shadow-sm ring-1 ring-blue-200 dark:ring-blue-800' 
+                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <Calendar size={12}/> Sắp tới
+                  </button>
+               </div>
+
+               {/* 3 Column Grid */}
+               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full overflow-y-auto lg:overflow-hidden p-1 custom-scrollbar">
+                  
+                  {/* Column 1: Past / Overdue */}
+                  <div className={`${mobileListTab === 'past' ? 'flex' : 'hidden'} lg:flex flex-col h-full bg-stone-50 dark:bg-stone-900/10 rounded-xl border border-stone-100 dark:border-stone-800 overflow-hidden mb-4 lg:mb-0`}>
+                      <div className="p-3 border-b border-stone-100 dark:border-stone-800 bg-stone-100/50 dark:bg-stone-900/30 flex justify-between items-center sticky top-0 z-10">
+                          <h3 className="font-bold text-stone-700 dark:text-stone-300 flex items-center gap-2 text-sm uppercase tracking-wide">
+                              <History size={16} /> Việc cũ / Quá hạn
+                          </h3>
+                          <span className="bg-stone-200 dark:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs font-bold px-2 py-0.5 rounded-full">
+                              {pastTasks.length}
+                          </span>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar min-h-[100px]">
+                          {pastTasks.length > 0 ? pastTasks.map(renderTaskCard) : (
+                              <div className="flex flex-col items-center justify-center h-40 text-stone-300 dark:text-stone-800/50">
+                                  <History size={40} className="mb-2 opacity-50"/>
+                                  <p className="text-xs font-medium">Không có việc cũ.</p>
+                              </div>
+                          )}
+                      </div>
+                  </div>
+
+                  {/* Column 2: Today */}
+                   <div className={`${mobileListTab === 'today' ? 'flex' : 'hidden'} lg:flex flex-col h-full bg-orange-50 dark:bg-orange-900/10 rounded-xl border border-orange-100 dark:border-orange-900/30 overflow-hidden mb-4 lg:mb-0`}>
+                      <div className="p-3 border-b border-orange-100 dark:border-orange-900/30 bg-orange-100/50 dark:bg-orange-900/30 flex justify-between items-center sticky top-0 z-10">
+                          <h3 className="font-bold text-orange-700 dark:text-orange-300 flex items-center gap-2 text-sm uppercase tracking-wide">
+                              <Flame size={16} /> Việc hôm nay
+                          </h3>
+                          <span className="bg-orange-200 dark:bg-orange-800 text-orange-800 dark:text-orange-200 text-xs font-bold px-2 py-0.5 rounded-full">
+                              {todayTasks.length}
+                          </span>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar min-h-[100px]">
+                          {todayTasks.length > 0 ? todayTasks.map(renderTaskCard) : (
+                               <div className="flex flex-col items-center justify-center h-40 text-orange-300 dark:text-orange-800/50">
+                                  <CheckCircle2 size={40} className="mb-2 opacity-50"/>
+                                  <p className="text-xs font-medium">Hôm nay rảnh rỗi!</p>
+                              </div>
+                          )}
+                      </div>
+                  </div>
+
+                  {/* Column 3: Upcoming */}
+                   <div className={`${mobileListTab === 'upcoming' ? 'flex' : 'hidden'} lg:flex flex-col h-full bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/30 overflow-hidden mb-4 lg:mb-0`}>
+                      <div className="p-3 border-b border-blue-100 dark:border-blue-900/30 bg-blue-100/50 dark:bg-blue-900/30 flex justify-between items-center sticky top-0 z-10">
+                          <h3 className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-2 text-sm uppercase tracking-wide">
+                              <Calendar size={16} /> Việc sắp tới
+                          </h3>
+                          <span className="bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 text-xs font-bold px-2 py-0.5 rounded-full">
+                              {upcomingTasks.length}
+                          </span>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar min-h-[100px]">
+                          {upcomingTasks.length > 0 ? upcomingTasks.map(renderTaskCard) : (
+                               <div className="flex flex-col items-center justify-center h-40 text-blue-300 dark:text-blue-800/50">
+                                  <Calendar size={40} className="mb-2 opacity-50"/>
+                                  <p className="text-xs font-medium">Chưa có kế hoạch xa.</p>
+                              </div>
+                          )}
+                      </div>
+                  </div>
+
+               </div>
             </div>
         );
     }

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Flame, CheckCircle2, WifiOff, AlertTriangle } from 'lucide-react';
-import { signInWithGoogle } from '../services/firebase';
+import { Flame, CheckCircle2, WifiOff, AlertTriangle, Mail, Lock, X, LogIn } from 'lucide-react';
+import { signInWithGoogle, signInWithEmail } from '../services/firebase';
 
 interface LoginScreenProps {
   onBypassAuth: () => void;
@@ -10,6 +10,11 @@ interface LoginScreenProps {
 const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Secret Login State
+  const [showSecretLogin, setShowSecretLogin] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const handleLogin = async () => {
     setIsLoading(true);
@@ -28,9 +33,24 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
     }
   };
 
+  const handleSecretLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
+    
+    setIsLoading(true);
+    setError(null);
+    try {
+        await signInWithEmail(email, password);
+    } catch (err: any) {
+        setError("Tài khoản hoặc mật khẩu không đúng.");
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#fff7ed] dark:bg-gray-950 flex flex-col items-center justify-center p-4 transition-colors duration-300">
-      <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-orange-100 dark:border-gray-800 p-8 text-center animate-in fade-in zoom-in duration-500">
+      <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-orange-100 dark:border-gray-800 p-8 text-center animate-in fade-in zoom-in duration-500 relative">
         
         {/* Logo Animation */}
         <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-red-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-6 transform hover:rotate-6 transition-transform duration-300">
@@ -48,7 +68,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
         <div className="text-left space-y-3 mb-8 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
            <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <CheckCircle2 size={16} className="text-green-500" />
-              <span>Đồng bộ dữ liệu trên mọi thiết bị</span>
+              {/* THE SECRET TRIGGER: No cursor pointer, no hover effect */}
+              <span 
+                onClick={() => setShowSecretLogin(true)} 
+                className="cursor-default select-none"
+              >
+                Đồng bộ dữ liệu trên mọi thiết bị
+              </span>
            </div>
            <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <CheckCircle2 size={16} className="text-green-500" />
@@ -103,6 +129,53 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
         <p className="mt-6 text-[10px] text-gray-400 dark:text-gray-500">
           * Chế độ Offline sẽ lưu dữ liệu trên trình duyệt của bạn. Dữ liệu có thể mất nếu xóa cache.
         </p>
+
+        {/* Secret Login Modal */}
+        {showSecretLogin && (
+            <div className="absolute inset-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-2xl animate-in fade-in duration-200">
+                <button 
+                    onClick={() => { setShowSecretLogin(false); setError(null); }} 
+                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                    <X size={24} />
+                </button>
+                <div className="w-full max-w-xs p-4">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-6">Admin Login</h2>
+                    <form onSubmit={handleSecretLogin} className="space-y-4">
+                        <div className="relative">
+                            <Mail size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                            <input 
+                                type="email" 
+                                placeholder="Email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                required
+                            />
+                        </div>
+                        <div className="relative">
+                            <Lock size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                            <input 
+                                type="password" 
+                                placeholder="Password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                required
+                            />
+                        </div>
+                        <button 
+                            type="submit" 
+                            disabled={isLoading}
+                            className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 rounded-lg transition flex items-center justify-center gap-2"
+                        >
+                            {isLoading ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> : <LogIn size={18} />}
+                            Đăng nhập
+                        </button>
+                    </form>
+                </div>
+            </div>
+        )}
       </div>
     </div>
   );
