@@ -12,6 +12,22 @@
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              gray: {
+                750: '#2d3748',
+                850: '#1a202c',
+                950: '#0d1117',
+              }
+            }
+          }
+        }
+      }
+    </script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -20,12 +36,22 @@
         background-color: #fff7ed; 
         overscroll-behavior-y: none;
         -webkit-tap-highlight-color: transparent;
+        transition: background-color 0.3s ease;
+      }
+
+      /* Dark mode body background override */
+      html.dark body {
+        background-color: #0f172a; /* Slate 950 */
+        color: #e2e8f0; /* Slate 200 */
       }
       
       ::-webkit-scrollbar { width: 4px; height: 4px; }
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: #fdba74; border-radius: 4px; }
       ::-webkit-scrollbar-thumb:hover { background: #fb923c; }
+
+      html.dark ::-webkit-scrollbar-thumb { background: #475569; }
+      html.dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }
       
       .no-scrollbar::-webkit-scrollbar {
         display: none;
@@ -33,6 +59,13 @@
       .no-scrollbar {
         -ms-overflow-style: none;
         scrollbar-width: none;
+      }
+      
+      /* Smooth transition for dark mode colors */
+      *, *::before, *::after {
+        transition-property: background-color, border-color, color, fill, stroke;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 150ms;
       }
     </style>
   <script type="importmap">

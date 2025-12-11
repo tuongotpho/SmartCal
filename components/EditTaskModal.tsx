@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Task, RecurringType, Tag, Subtask } from '../types';
 import { X, Save, Calendar, Clock, FileText, Type, Repeat, CheckCircle2, Tag as TagIcon, ListChecks, Plus, Trash2, CheckSquare, Square, ArrowRight, Mic, MicOff, Sparkles, RefreshCw } from 'lucide-react';
@@ -172,7 +173,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-orange-950/30 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 border border-orange-100 flex flex-col max-h-[90vh]">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 border border-orange-100 dark:border-gray-700 flex flex-col max-h-[90vh]">
         <div className="bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-4 flex justify-between items-center flex-shrink-0">
           <h2 className="text-lg font-bold flex items-center gap-2">
             {formData.id === 'temp' ? 'Thêm công việc mới' : 'Chỉnh sửa công việc'}
@@ -183,7 +184,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
         <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
           {/* Title Input with Voice Button */}
           <div>
-            <label className="block text-xs font-bold text-gray-600 mb-1 flex items-center gap-1 justify-between">
+            <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1 flex items-center gap-1 justify-between">
               <span className="flex items-center gap-1"><Type size={14} /> Tiêu đề</span>
               {isListening && <span className="text-red-500 animate-pulse flex items-center gap-1"><Mic size={12}/> Đang nghe...</span>}
               {isProcessingAI && <span className="text-blue-500 animate-pulse flex items-center gap-1"><Sparkles size={12}/> Đang phân tích...</span>}
@@ -195,7 +196,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="VD: Họp team vào 9h sáng mai"
                   style={{ colorScheme: 'light' }}
-                  className="flex-1 bg-white text-gray-900 border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                  className="flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
                   autoFocus={formData.id === 'temp'}
                 />
                 <button 
@@ -204,7 +205,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                     className={`p-2 rounded border transition-all shadow-sm flex-shrink-0
                         ${isListening 
                             ? 'bg-red-500 text-white border-red-600 animate-pulse ring-2 ring-red-200' 
-                            : 'bg-white text-gray-500 border-gray-300 hover:text-orange-600 hover:border-orange-300'
+                            : 'bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:text-orange-600 hover:border-orange-300'
                         }
                         ${isProcessingAI ? 'opacity-50 cursor-not-allowed' : ''}
                     `}
@@ -219,10 +220,10 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
           </div>
 
           {/* Date Range Section */}
-          <div className="flex flex-col gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+          <div className="flex flex-col gap-2 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-200 dark:border-gray-600">
              <div className="flex items-center gap-2">
                 <div className="flex-1">
-                  <label className="block text-xs font-bold text-gray-600 mb-1 flex items-center gap-1">
+                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1 flex items-center gap-1">
                     <Calendar size={14} /> Bắt đầu
                   </label>
                   <input
@@ -230,14 +231,14 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                     value={formData.date}
                     onChange={handleStartDateChange}
                     style={{ colorScheme: 'light' }}
-                    className="w-full bg-white text-gray-900 border border-gray-300 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
+                    className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
                   />
                 </div>
                 <div className="pt-5 text-gray-400">
                    <ArrowRight size={16} />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-xs font-bold text-gray-600 mb-1 flex items-center gap-1">
+                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1 flex items-center gap-1">
                     Kết thúc
                   </label>
                   <input
@@ -246,14 +247,14 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                     value={formData.endDate || formData.date}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     style={{ colorScheme: 'light' }}
-                    className="w-full bg-white text-gray-900 border border-gray-300 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
+                    className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
                   />
                 </div>
              </div>
              
              {/* Time Picker */}
              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1 flex items-center gap-1">
+                <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1 flex items-center gap-1">
                   <Clock size={14} /> Giờ (áp dụng cho ngày bắt đầu)
                 </label>
                 <input
@@ -261,7 +262,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                   value={formData.time}
                   onChange={(e) => setFormData({ ...formData, time: e.target.value })}
                   style={{ colorScheme: 'light' }}
-                  className="w-full bg-white text-gray-900 border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                  className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
                 />
              </div>
           </div>
@@ -269,14 +270,14 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
           <div className="grid grid-cols-2 gap-3">
              {/* Recurring Select */}
             <div className="flex flex-col gap-1">
-               <label className="text-xs font-bold text-gray-600 flex items-center gap-1">
+               <label className="text-xs font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1">
                   <Repeat size={14} /> Lặp lại
                </label>
                <select
                   value={formData.recurringType || 'none'}
                   onChange={(e) => setFormData({ ...formData, recurringType: e.target.value as RecurringType })}
                   style={{ colorScheme: 'light' }}
-                  className="w-full bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold rounded px-2 py-2.5 focus:ring-2 focus:ring-rose-500 outline-none cursor-pointer"
+                  className="w-full bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200 text-xs font-semibold rounded px-2 py-2.5 focus:ring-2 focus:ring-rose-500 outline-none cursor-pointer"
                >
                   <option value="none">Không lặp lại</option>
                   <option value="daily">Hàng ngày</option>
@@ -288,14 +289,14 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
 
             {/* Tag Select */}
             <div className="flex flex-col gap-1">
-               <label className="text-xs font-bold text-gray-600 flex items-center gap-1">
+               <label className="text-xs font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1">
                   <TagIcon size={14} /> Phân loại
                </label>
                <select
                   value={formData.tag || 'Khác'}
                   onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
                   style={{ colorScheme: 'light' }}
-                  className="w-full bg-blue-50 border border-blue-200 text-blue-900 text-xs font-semibold rounded px-2 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+                  className="w-full bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200 text-xs font-semibold rounded px-2 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
                >
                   {tags.map(t => (
                     <option key={t.name} value={t.name}>{t.name}</option>
@@ -306,19 +307,19 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
 
           {/* Completed Toggle */}
           <div className="flex flex-col gap-1">
-               <label className="text-xs font-bold text-gray-600 flex items-center gap-1">
+               <label className="text-xs font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1">
                   <CheckCircle2 size={14} /> Trạng thái
                </label>
-               <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded border border-green-100 cursor-pointer hover:bg-green-100 transition" onClick={() => setFormData({ ...formData, completed: !formData.completed })}>
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${formData.completed ? 'bg-green-500 border-green-500' : 'bg-white border-gray-300'}`}>
+               <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded border border-green-100 dark:border-green-800 cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/30 transition" onClick={() => setFormData({ ...formData, completed: !formData.completed })}>
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${formData.completed ? 'bg-green-500 border-green-500' : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500'}`}>
                     {formData.completed && <CheckCircle2 size={10} className="text-white" />}
                   </div>
-                  <span className="text-xs font-bold text-green-900">{formData.completed ? "Đã hoàn thành" : "Đang thực hiện"}</span>
+                  <span className="text-xs font-bold text-green-900 dark:text-green-300">{formData.completed ? "Đã hoàn thành" : "Đang thực hiện"}</span>
                </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-600 mb-1 flex items-center gap-1">
+            <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1 flex items-center gap-1">
               <FileText size={14} /> Chi tiết / Ghi chú
             </label>
             <textarea
@@ -326,13 +327,13 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
               value={formData.description || ''}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               style={{ colorScheme: 'light' }}
-              className="w-full bg-white text-gray-900 border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none"
+              className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none"
             />
           </div>
 
           {/* Subtasks Section */}
           <div>
-            <label className="block text-xs font-bold text-gray-600 mb-2 flex items-center gap-1">
+            <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-2 flex items-center gap-1">
               <ListChecks size={14} /> Công việc con (Checklist)
             </label>
             
@@ -343,30 +344,30 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                 onChange={(e) => setNewSubtaskTitle(e.target.value)}
                 placeholder="Thêm bước nhỏ..."
                 style={{ colorScheme: 'light' }}
-                className="flex-1 bg-white border border-gray-300 rounded px-3 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
+                className="flex-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded px-3 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
                 onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()}
               />
-              <button onClick={handleAddSubtask} className="bg-orange-100 text-orange-600 p-1.5 rounded hover:bg-orange-200 transition">
+              <button onClick={handleAddSubtask} className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 p-1.5 rounded hover:bg-orange-200 dark:hover:bg-orange-900/50 transition">
                 <Plus size={16} />
               </button>
             </div>
 
-            <div className="space-y-1.5 bg-gray-50 p-2 rounded border border-gray-200 min-h-[50px]">
+            <div className="space-y-1.5 bg-gray-50 dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700 min-h-[50px]">
               {formData.subtasks && formData.subtasks.length > 0 ? (
                 formData.subtasks.map((st) => (
-                  <div key={st.id} className="flex items-center gap-2 bg-white p-2 rounded border border-gray-100 shadow-sm group">
+                  <div key={st.id} className="flex items-center gap-2 bg-white dark:bg-gray-700 p-2 rounded border border-gray-100 dark:border-gray-600 shadow-sm group">
                     <button 
                       onClick={() => handleToggleSubtask(st.id)}
-                      className={`text-gray-400 hover:text-green-600 transition ${st.completed ? 'text-green-500' : ''}`}
+                      className={`text-gray-400 dark:text-gray-500 hover:text-green-600 transition ${st.completed ? 'text-green-500 dark:text-green-400' : ''}`}
                     >
                       {st.completed ? <CheckSquare size={16} /> : <Square size={16} />}
                     </button>
-                    <span className={`flex-1 text-xs ${st.completed ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                    <span className={`flex-1 text-xs ${st.completed ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-200'}`}>
                       {st.title}
                     </span>
                     <button 
                       onClick={() => handleDeleteSubtask(st.id)}
-                      className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"
+                      className="text-gray-300 dark:text-gray-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -380,10 +381,10 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
 
         </div>
 
-        <div className="bg-gray-50 px-6 py-4 flex justify-end gap-2 flex-shrink-0">
+        <div className="bg-gray-50 dark:bg-gray-900 px-6 py-4 flex justify-end gap-2 flex-shrink-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-200 text-sm font-medium transition"
+            className="px-4 py-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 text-sm font-medium transition"
           >
             Hủy
           </button>

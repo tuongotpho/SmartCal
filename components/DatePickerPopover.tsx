@@ -48,7 +48,7 @@ const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({ currentDate, onDa
             className={`p-2 rounded-lg text-xs font-semibold transition-colors ${
               isSelected 
                 ? 'bg-orange-500 text-white shadow-md' 
-                : 'bg-orange-50 text-gray-700 hover:bg-orange-100 hover:text-orange-600'
+                : 'bg-orange-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-orange-100 dark:hover:bg-gray-600 hover:text-orange-600 dark:hover:text-orange-400'
             }`}
           >
             {month}
@@ -74,7 +74,7 @@ const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({ currentDate, onDa
               className={`p-2 rounded-lg text-sm font-bold transition-colors ${
                 isSelected 
                   ? 'bg-orange-500 text-white shadow-md' 
-                  : 'bg-orange-50 text-gray-700 hover:bg-orange-100 hover:text-orange-600'
+                  : 'bg-orange-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-orange-100 dark:hover:bg-gray-600 hover:text-orange-600 dark:hover:text-orange-400'
               }`}
             >
               {year}
@@ -86,26 +86,26 @@ const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({ currentDate, onDa
   };
 
   return (
-    <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-64 bg-white rounded-xl shadow-xl border border-orange-100 z-50 animate-in fade-in zoom-in-95 duration-200">
+    <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-orange-100 dark:border-gray-700 z-50 animate-in fade-in zoom-in-95 duration-200">
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-orange-50 bg-gradient-to-r from-orange-50 to-white rounded-t-xl">
+      <div className="flex items-center justify-between p-3 border-b border-orange-50 dark:border-gray-700 bg-gradient-to-r from-orange-50 to-white dark:from-gray-800 dark:to-gray-800 rounded-t-xl">
         <button 
           onClick={() => changeYearView(mode === 'month' ? -1 : -12)}
-          className="p-1 hover:bg-white rounded-full text-orange-600 transition shadow-sm"
+          className="p-1 hover:bg-white dark:hover:bg-gray-700 rounded-full text-orange-600 dark:text-orange-400 transition shadow-sm"
         >
           <ChevronLeft size={16} />
         </button>
         
         <button 
           onClick={() => setMode(mode === 'month' ? 'year' : 'month')}
-          className="text-sm font-bold text-gray-800 hover:text-orange-600 transition flex items-center gap-1 px-2 py-1 rounded hover:bg-white/50"
+          className="text-sm font-bold text-gray-800 dark:text-white hover:text-orange-600 dark:hover:text-orange-400 transition flex items-center gap-1 px-2 py-1 rounded hover:bg-white/50 dark:hover:bg-gray-700"
         >
           {mode === 'month' ? `Năm ${viewDate.getFullYear()}` : 'Chọn Năm'} <Calendar size={12} />
         </button>
 
         <button 
           onClick={() => changeYearView(mode === 'month' ? 1 : 12)}
-          className="p-1 hover:bg-white rounded-full text-orange-600 transition shadow-sm"
+          className="p-1 hover:bg-white dark:hover:bg-gray-700 rounded-full text-orange-600 dark:text-orange-400 transition shadow-sm"
         >
           <ChevronRight size={16} />
         </button>
@@ -117,10 +117,10 @@ const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({ currentDate, onDa
       </div>
 
       {/* Footer (Optional: Go to Today) */}
-      <div className="p-2 border-t border-orange-50 text-center">
+      <div className="p-2 border-t border-orange-50 dark:border-gray-700 text-center">
         <button 
           onClick={() => { onDateSelect(new Date()); onClose(); }}
-          className="text-xs text-orange-600 font-semibold hover:underline"
+          className="text-xs text-orange-600 dark:text-orange-400 font-semibold hover:underline"
         >
           Quay về Hôm nay
         </button>
