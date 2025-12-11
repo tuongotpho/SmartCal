@@ -59,7 +59,9 @@ import {
   X, 
   Plus,
   Moon,
-  Sun
+  Sun,
+  LogOut,
+  User
 } from 'lucide-react';
 import CalendarView from './components/CalendarView';
 import StatsView from './components/StatsView';
@@ -67,13 +69,19 @@ import SettingsModal from './components/SettingsModal';
 import EditTaskModal from './components/EditTaskModal';
 import ConfirmModal from './components/ConfirmModal';
 import DatePickerPopover from './components/DatePickerPopover';
+import LoginScreen from './components/LoginScreen';
 import Toast, { ToastMessage, ToastType } from './components/Toast';
 import { Task, TelegramConfig, ViewMode, RecurringType, Tag, DEFAULT_TASK_TAGS } from './types';
 import { parseTaskWithGemini, generateReport } from './services/geminiService';
 import { sendTelegramMessage, fetchTelegramUpdates, formatTaskForTelegram } from './services/telegramService';
-import { subscribeToTasks, subscribeToTags, saveTagsToFirestore, addTaskToFirestore, deleteTaskFromFirestore, updateTaskInFirestore } from './services/firebase';
+import { subscribeToTasks, subscribeToTags, saveTagsToFirestore, addTaskToFirestore, deleteTaskFromFirestore, updateTaskInFirestore, auth, logOut } from './services/firebase';
 
 const App: React.FC = () => {
+  // Auth State
+  const [user, setUser] = useState<any>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
+
   // State
   const [currentDate, setCurrentDate] = useState(new Date());
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -133,6 +141,19 @@ const App: React.FC = () => {
     return saved ? parseInt(saved, 10) : 0;
   });
 
+  // Auth Listener
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+      setIsAuthLoading(false);
+      if (currentUser) {
+        setIsOfflineMode(false);
+        setUseFirebase(true); // Re-enable firebase if logged in
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Toggle Dark Mode
   useEffect(() => {
     const root = window.document.documentElement;
@@ -182,12 +203,18 @@ const App: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Load Tasks Effect (Hybrid Strategy)
+  // Determine effective user ID for data fetching
+  const effectiveUserId = user ? user.uid : (isOfflineMode ? 'offline_user' : null);
+
+  // Load Tasks Effect (Updated to use effectiveUserId)
   useEffect(() => {
+    if (!effectiveUserId) return; // Wait for user or offline mode
+
     let unsubscribe: () => void;
 
-    if (useFirebase) {
+    if (useFirebase && !isOfflineMode) {
       unsubscribe = subscribeToTasks(
+        effectiveUserId, // Pass userId
         (fetchedTasks) => {
           setTasks(fetchedTasks);
           setFirebaseError(null);
@@ -195,37 +222,43 @@ const App: React.FC = () => {
         (error) => {
           const isPermissionError = error.message.includes('permission-denied') || error.code === 'permission-denied';
           const errorMsg = isPermissionError 
-            ? "API Firestore chưa được bật hoặc Rules chặn truy cập." 
+            ? "Lỗi quyền truy cập. Vui lòng kiểm tra Firestore Rules." 
             : (error.message || "Lỗi kết nối Firebase");
             
           console.log("Chuyển sang chế độ Offline do lỗi:", errorMsg);
-          // Only show error toast once when switching modes
           if (useFirebase) showToast(`Chuyển sang Offline: ${errorMsg}`, 'error');
           setFirebaseError(errorMsg);
           setUseFirebase(false);
         }
       );
     } else {
-      const saved = localStorage.getItem('localTasks');
+      // Offline fallback: Use local storage
+      const storageKey = isOfflineMode ? 'offlineTasks' : 'localTasks';
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
         try {
           setTasks(JSON.parse(saved));
         } catch (e) {
           console.error("Lỗi đọc LocalStorage", e);
         }
+      } else {
+        setTasks([]); // Reset if no data
       }
     }
 
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [useFirebase, showToast]);
+  }, [useFirebase, showToast, effectiveUserId, isOfflineMode]);
 
-  // Load Tags Effect (Firebase)
+  // Load Tags Effect (Updated to use effectiveUserId)
   useEffect(() => {
+    if (!effectiveUserId) return;
+
     let unsubscribeTags: () => void;
-    if (useFirebase) {
+    if (useFirebase && !isOfflineMode) {
       unsubscribeTags = subscribeToTags(
+        effectiveUserId,
         (fetchedTags) => {
           setTags(fetchedTags);
         },
@@ -247,19 +280,20 @@ const App: React.FC = () => {
     return () => {
       if (unsubscribeTags) unsubscribeTags();
     }
-  }, [useFirebase]);
+  }, [useFirebase, effectiveUserId, isOfflineMode]);
 
   // Sync LocalStorage when offline
   useEffect(() => {
-    if (!useFirebase) {
+    if (!useFirebase || isOfflineMode) {
       try {
-        localStorage.setItem('localTasks', JSON.stringify(tasks));
+        const storageKey = isOfflineMode ? 'offlineTasks' : 'localTasks';
+        localStorage.setItem(storageKey, JSON.stringify(tasks));
         localStorage.setItem('taskTags', JSON.stringify(tags));
       } catch (e) {
         console.error("Error saving to LocalStorage", e);
       }
     }
-  }, [tasks, tags, useFirebase]);
+  }, [tasks, tags, useFirebase, isOfflineMode]);
 
   useEffect(() => {
     try {
@@ -278,7 +312,7 @@ const App: React.FC = () => {
   const handleUpdateTask = useCallback(async (updatedTask: Task, showNotification: boolean = true) => {
     setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
 
-    if (useFirebase) {
+    if (useFirebase && !isOfflineMode) {
       try {
         await updateTaskInFirestore(updatedTask);
         if (showNotification) showToast("Cập nhật thành công", "success");
@@ -290,14 +324,14 @@ const App: React.FC = () => {
     } else {
       if (showNotification) showToast("Đã lưu (Offline)", "success");
     }
-  }, [useFirebase, showToast]);
+  }, [useFirebase, showToast, isOfflineMode]);
 
   const handleSaveTags = useCallback(async (newTags: Tag[]) => {
     setTags(newTags); // Optimistic UI update
     
-    if (useFirebase) {
+    if (useFirebase && user && !isOfflineMode) {
       try {
-        await saveTagsToFirestore(newTags);
+        await saveTagsToFirestore(user.uid, newTags);
         showToast("Đã lưu danh sách thẻ", "success");
       } catch (e) {
         console.error("Lỗi lưu tags lên Firebase", e);
@@ -306,7 +340,7 @@ const App: React.FC = () => {
     } else {
       showToast("Đã lưu thẻ (Offline)", "success");
     }
-  }, [useFirebase, showToast]);
+  }, [useFirebase, showToast, user, isOfflineMode]);
 
   const handleToggleComplete = useCallback(async (task: Task) => {
     const updatedTask = { ...task, completed: !task.completed };
@@ -410,9 +444,10 @@ const App: React.FC = () => {
     const taskWithTempId = { ...newTask, id: tempId };
     setTasks(prev => [...prev, taskWithTempId]);
 
-    if (useFirebase) {
+    if (useFirebase && user && !isOfflineMode) {
       try {
         await addTaskToFirestore({
+          userId: user.uid, // Attach userId
           title: newTask.title,
           date: newTask.date,
           time: newTask.time,
@@ -455,7 +490,7 @@ const App: React.FC = () => {
         sendTelegramMessage(telegramConfig, deleteMsg);
       }
 
-      if (useFirebase) {
+      if (useFirebase && !isOfflineMode) {
         try {
           await deleteTaskFromFirestore(id);
           showToast("Đã xóa công việc", "success");
@@ -470,7 +505,7 @@ const App: React.FC = () => {
       }
     }
     setTaskToDeleteId(null);
-  }, [taskToDeleteId, tasks, telegramConfig, useFirebase, showToast]);
+  }, [taskToDeleteId, tasks, telegramConfig, useFirebase, showToast, isOfflineMode]);
 
   const openEditModal = useCallback((task: Task) => {
     setEditingTask(task);
@@ -485,6 +520,7 @@ const App: React.FC = () => {
     
     const newTask: Task = {
       id: "temp",
+      userId: user?.uid || (isOfflineMode ? 'offline_user' : undefined),
       title: "",
       date: targetDate,
       time: format(now, "HH:mm"),
@@ -505,6 +541,120 @@ const App: React.FC = () => {
     setViewMode(ViewMode.DAY);
   };
 
+  // --- Navigation & View Logic ---
+  const handlePrev = useCallback(() => {
+    if (viewMode === ViewMode.DAY) {
+      setCurrentDate(prev => addDays(prev, -1));
+    } else if (viewMode === ViewMode.WEEK) {
+      setCurrentDate(prev => addWeeks(prev, -1));
+    } else {
+      setCurrentDate(prev => addMonths(prev, -1));
+    }
+  }, [viewMode]);
+
+  const handleNext = useCallback(() => {
+    if (viewMode === ViewMode.DAY) {
+      setCurrentDate(prev => addDays(prev, 1));
+    } else if (viewMode === ViewMode.WEEK) {
+      setCurrentDate(prev => addWeeks(prev, 1));
+    } else {
+      setCurrentDate(prev => addMonths(prev, 1));
+    }
+  }, [viewMode]);
+
+  const getHeaderText = useMemo(() => {
+    if (viewMode === ViewMode.DAY) {
+      return format(currentDate, 'dd/MM/yyyy');
+    }
+    if (viewMode === ViewMode.WEEK) {
+      const start = startOfWeek(currentDate, { weekStartsOn: 1 });
+      const end = endOfWeek(currentDate, { weekStartsOn: 1 });
+      return `Tuần ${getWeek(currentDate, { weekStartsOn: 1 })} (${format(start, 'dd/MM')} - ${format(end, 'dd/MM')})`;
+    }
+    return `Tháng ${format(currentDate, 'MM/yyyy')}`;
+  }, [viewMode, currentDate]);
+
+  const renderContent = useCallback(() => {
+    if (viewMode === ViewMode.STATS) {
+      return <StatsView currentDate={currentDate} tasks={filteredTasks} tags={tags} />;
+    }
+    
+    if (viewMode === ViewMode.LIST) {
+      const sortedTasks = [...filteredTasks].sort((a,b) => {
+        const dateA = new Date(`${a.date}T${a.time}`);
+        const dateB = new Date(`${b.date}T${b.time}`);
+        return dateA.getTime() - dateB.getTime();
+      });
+
+      return (
+        <div className="h-full overflow-y-auto p-2 sm:p-4 bg-white dark:bg-gray-900 pb-32 lg:pb-0 custom-scrollbar">
+          <h3 className="font-bold mb-3 text-orange-800 dark:text-orange-400 flex items-center gap-2 sticky top-0 bg-white dark:bg-gray-900 py-2 z-10 border-b border-gray-100 dark:border-gray-800">
+             <ListChecks size={20}/> Danh sách công việc
+          </h3>
+          <div className="space-y-3">
+            {sortedTasks.length === 0 && (
+              <div className="text-center py-10 text-gray-400 flex flex-col items-center">
+                <Sparkles size={40} className="mb-2 opacity-50"/>
+                <p>Không có công việc nào trong danh sách.</p>
+              </div>
+            )}
+            {sortedTasks.map(task => {
+              const tagConfig = tags.find(t => t.name === task.tag) || tags.find(t => t.name === 'Khác');
+              return (
+                <div 
+                  key={task.id} 
+                  onClick={() => openEditModal(task)}
+                  className={`p-3 rounded-lg border-l-4 shadow-sm bg-white dark:bg-gray-800 flex items-start gap-3 cursor-pointer hover:shadow-md transition group
+                    ${task.completed 
+                      ? 'border-gray-300 dark:border-gray-600 opacity-60' 
+                      : (tagConfig?.color.split(' ')[1] || 'border-orange-400')}
+                  `}
+                >
+                  <button onClick={(e) => { e.stopPropagation(); handleToggleComplete(task); }} className={`mt-1 flex-shrink-0 ${task.completed ? 'text-green-500' : 'text-gray-300 group-hover:text-green-500'}`}>
+                    {task.completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start">
+                      <h4 className={`font-semibold text-sm sm:text-base truncate ${task.completed ? 'line-through text-gray-500' : 'text-gray-800 dark:text-gray-200'}`}>{task.title}</h4>
+                      <span className="text-[10px] sm:text-xs font-medium text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full whitespace-nowrap ml-2">
+                        {task.date}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <span className="flex items-center gap-1 font-mono"><Clock size={12}/> {task.time}</span>
+                      {task.tag && (
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-700">
+                          <span className={`w-1.5 h-1.5 rounded-full ${tagConfig?.dot}`}></span> {task.tag}
+                        </span>
+                      )}
+                      {task.recurringType !== 'none' && <Repeat size={12} className="text-blue-500"/>}
+                    </div>
+                    {task.description && <p className="text-xs text-gray-400 mt-1 line-clamp-1">{task.description}</p>}
+                  </div>
+                  <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition"><Trash2 size={16}/></button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <CalendarView 
+        currentDate={currentDate}
+        viewMode={viewMode}
+        tasks={filteredTasks}
+        tags={tags}
+        onDeleteTask={handleDeleteTask}
+        onEditTask={openEditModal}
+        onToggleComplete={handleToggleComplete}
+        onMoveTask={handleMoveTask}
+        onSelectDate={handleDaySelect}
+      />
+    );
+  }, [viewMode, currentDate, filteredTasks, tags, openEditModal, handleToggleComplete, handleDeleteTask, handleMoveTask]);
+
   const handleQuickAdd = async () => {
     if (!quickInput.trim()) return;
 
@@ -518,6 +668,7 @@ const App: React.FC = () => {
       
       const newTask: Task = {
         id: "temp",
+        userId: user?.uid || (isOfflineMode ? 'offline_user' : undefined),
         title: title.trim(),
         date,
         time,
@@ -538,6 +689,7 @@ const App: React.FC = () => {
         if (result) {
           const newTask: Task = {
             id: "temp",
+            userId: user?.uid || (isOfflineMode ? 'offline_user' : undefined),
             title: result.title,
             date: result.date,
             time: result.time,
@@ -618,7 +770,7 @@ const App: React.FC = () => {
   };
 
   const executeTelegramSync = async (isManual: boolean = false) => {
-    if (!telegramConfig.botToken) return;
+    if (!telegramConfig.botToken || (!user && !isOfflineMode)) return;
     if (isManual) setIsProcessingAI(true);
     
     try {
@@ -639,6 +791,7 @@ const App: React.FC = () => {
           if (!exists) {
             await handleAddTask({
               id: "temp",
+              userId: user?.uid || (isOfflineMode ? 'offline_user' : undefined),
               title: result.title,
               date: result.date,
               time: result.time,
@@ -676,307 +829,21 @@ const App: React.FC = () => {
       executeTelegramSync(false);
     }, 60 * 1000); // 1 minute auto-sync
     return () => clearInterval(intervalId);
-  }, [telegramConfig, tasks, lastTelegramUpdateId]);
+  }, [telegramConfig, tasks, lastTelegramUpdateId, user, isOfflineMode]);
 
-  // Navigation Handlers
-  const handlePrev = useCallback(() => {
-    if (viewMode === ViewMode.WEEK) setCurrentDate(prev => addWeeks(prev, -1));
-    else if (viewMode === ViewMode.DAY) setCurrentDate(prev => addDays(prev, -1));
-    else setCurrentDate(prev => addMonths(prev, -1));
-  }, [viewMode]);
+  // If loading auth state
+  if (isAuthLoading) {
+     return (
+        <div className="flex h-screen items-center justify-center bg-[#fff7ed] dark:bg-gray-950 text-orange-600">
+           <RefreshCw className="animate-spin" size={32} />
+        </div>
+     );
+  }
 
-  const handleNext = useCallback(() => {
-    if (viewMode === ViewMode.WEEK) setCurrentDate(prev => addWeeks(prev, 1));
-    else if (viewMode === ViewMode.DAY) setCurrentDate(prev => addDays(prev, 1));
-    else setCurrentDate(prev => addMonths(prev, 1));
-  }, [viewMode]);
-
-  // Header Text
-  const getHeaderText = useMemo(() => {
-    if (viewMode === ViewMode.WEEK) {
-      const start = startOfWeek(currentDate, { weekStartsOn: 1 });
-      const end = endOfWeek(currentDate, { weekStartsOn: 1 });
-      return `Tuần ${getWeek(currentDate)} (${format(start, 'dd/MM')} - ${format(end, 'dd/MM')})`;
-    }
-    if (viewMode === ViewMode.DAY) {
-      return format(currentDate, 'dd/MM/yyyy');
-    }
-    return `Tháng ${format(currentDate, 'MM/yyyy')}`;
-  }, [viewMode, currentDate]);
-
-  const GreetingSection = useMemo(() => {
-    const hour = new Date().getHours();
-    let greeting = "Chào buổi sáng";
-    if (hour >= 12 && hour < 18) greeting = "Chào buổi chiều";
-    else if (hour >= 18) greeting = "Buổi tối vui vẻ";
-
-    const todayTasks = filteredTasks.filter(t => isToday(new Date(t.date)) && !t.completed).length;
-
-    return (
-      <div className="mb-4 px-1 lg:col-span-3">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">{greeting} 👋</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-300 mt-1">
-          Hôm nay bạn có <span className="font-bold text-orange-600 dark:text-orange-400">{todayTasks}</span> công việc cần hoàn thành.
-        </p>
-      </div>
-    );
-  }, [filteredTasks]);
-
-  const renderContent = () => {
-    switch (viewMode) {
-      case ViewMode.STATS:
-        return <StatsView currentDate={currentDate} tasks={filteredTasks} tags={tags} />;
-      case ViewMode.LIST:
-        // Helper function to check if a task is active on a specific date
-        // considering recurrence and multi-day duration
-        const checkIsActiveOnDate = (task: Task, dateToCheck: Date) => {
-           const tStart = startOfDay(new Date(task.date));
-           const tEnd = task.endDate ? startOfDay(new Date(task.endDate)) : tStart;
-           const check = startOfDay(dateToCheck);
-           
-           // 1. Recurring Logic (Simplification: Only checking Start Date patterns currently for List view)
-           // In a full implementation, we'd need to generate instances. 
-           // For now, if it's recurring, we only match the start pattern.
-           const recType = task.recurringType || (task.isRecurring ? 'daily' : 'none');
-           if (recType !== 'none') {
-              if (check.getTime() < tStart.getTime()) return false;
-              switch (recType) {
-                 case 'daily': return true;
-                 case 'weekly': return getDay(check) === getDay(tStart);
-                 case 'monthly': return getDate(check) === getDate(tStart);
-                 case 'yearly': return getDate(check) === getDate(tStart) && getMonth(check) === getMonth(tStart);
-                 default: return false;
-              }
-           }
-           
-           // 2. Multi-day / Single-day Logic
-           return isWithinInterval(check, { start: tStart, end: tEnd });
-        };
-
-        const today = new Date();
-        const startOfToday = startOfDay(today);
-        const startOfTomorrow = addDays(startOfToday, 1);
-
-        const groups = {
-          overdue: [] as Task[],
-          today: [] as Task[],
-          tomorrow: [] as Task[],
-          upcoming: [] as Task[],
-        };
-
-        const sortedTasks = [...filteredTasks].sort((a, b) => {
-           return compareAsc(new Date(`${a.date}T${a.time}`), new Date(`${b.date}T${b.time}`));
-        });
-
-        sortedTasks.forEach(task => {
-          if (task.completed) return; 
-
-          const tStart = startOfDay(new Date(task.date));
-          const tEnd = task.endDate ? startOfDay(new Date(task.endDate)) : tStart;
-
-          // Overdue: Only if End Date is strictly before Today
-          if (isBefore(tEnd, startOfToday)) {
-             groups.overdue.push(task);
-             return; 
-          }
-
-          // Active Today?
-          if (checkIsActiveOnDate(task, startOfToday)) {
-             groups.today.push(task);
-          }
-
-          // Active Tomorrow?
-          if (checkIsActiveOnDate(task, startOfTomorrow)) {
-             groups.tomorrow.push(task);
-          }
-
-          // Upcoming: Starts STRICTLY after Tomorrow
-          // (If it started today and spans to next week, it's already in Today/Tomorrow, 
-          //  so we don't put it in Upcoming to reduce noise, unless user wants to see future start dates)
-          if (isAfter(tStart, startOfTomorrow)) {
-             groups.upcoming.push(task);
-          }
-        });
-        
-        const renderTaskCard = (task: Task) => {
-           const tagConfig = tags.find(t => t.name === task.tag) || tags.find(t => t.name === 'Khác');
-           const totalSub = task.subtasks?.length || 0;
-           const doneSub = task.subtasks?.filter(s => s.completed).length || 0;
-           const progress = totalSub > 0 ? (doneSub / totalSub) * 100 : 0;
-           
-           // Calculate dates for display
-           const taskDate = new Date(task.date);
-           const taskEndDate = task.endDate ? new Date(task.endDate) : taskDate;
-           const dateDisplay = format(taskDate, 'dd/MM');
-           const isTaskToday = isToday(taskDate);
-           
-           // Multi-day info
-           const isMultiDay = !isToday(taskDate) || (task.endDate && !isToday(new Date(task.endDate)));
-           let multiDayInfo = "";
-           
-           if (task.endDate && task.date !== task.endDate && (task.recurringType === 'none')) {
-              const start = startOfDay(new Date(task.date));
-              const end = startOfDay(new Date(task.endDate));
-              const now = startOfDay(new Date());
-              const totalDays = differenceInDays(end, start) + 1;
-              
-              // Calculate current day index relative to Today
-              // If viewing in "Tomorrow" column, this logic is slightly off visually but acceptable.
-              // Better to show "Day X/Y" based on real time.
-              let currentDayIndex = differenceInDays(now, start) + 1;
-              if (currentDayIndex < 1) currentDayIndex = 1; // Future start
-              if (currentDayIndex > totalDays) currentDayIndex = totalDays; // Overdue
-
-              multiDayInfo = `(Ngày ${currentDayIndex}/${totalDays})`;
-           }
-
-           return (
-             <div 
-                key={task.id} 
-                onClick={() => openEditModal(task)}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-gray-900 border border-orange-50 dark:border-gray-700 p-4 mb-3 relative overflow-hidden group active:scale-[0.98] transition-transform duration-200 cursor-pointer"
-             >
-                {/* Colored Left Border */}
-                <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${tagConfig?.color ? tagConfig.dot.replace('text', 'bg') : 'bg-gray-400'}`}></div>
-                
-                <div className="pl-3 flex justify-between items-start">
-                   <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                         {/* Date Badge */}
-                         <span className={`text-xs font-bold px-2 py-0.5 rounded flex items-center gap-1 ${isTaskToday ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/40 dark:text-orange-200' : 'text-blue-600 bg-blue-50 dark:bg-blue-900/40 dark:text-blue-200'}`}>
-                            <CalendarDays size={12}/> {dateDisplay}
-                         </span>
-
-                         <span className="text-xs font-bold text-gray-500 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded flex items-center gap-1">
-                            <Clock size={12}/> {task.time}
-                         </span>
-                         {task.recurringType && task.recurringType !== 'none' && (
-                            <span className="text-xs font-bold text-rose-500 dark:text-rose-300 bg-rose-50 dark:bg-rose-900/40 px-2 py-0.5 rounded flex items-center gap-1">
-                               <Repeat size={12}/> {task.recurringType}
-                            </span>
-                         )}
-                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${tagConfig?.color} bg-opacity-10 border-opacity-20`}>
-                            {task.tag || 'Khác'}
-                         </span>
-                      </div>
-                      <h3 className={`font-bold text-gray-800 dark:text-gray-100 text-sm sm:text-base ${task.completed ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>
-                        {task.title} {multiDayInfo && <span className="text-xs font-normal text-orange-600 dark:text-orange-400 ml-1">{multiDayInfo}</span>}
-                      </h3>
-                      {task.description && <p className="text-xs text-gray-500 dark:text-gray-300 mt-1 line-clamp-1">{task.description}</p>}
-                      
-                      {/* Subtask Progress Bar */}
-                      {totalSub > 0 && (
-                        <div className="mt-3">
-                           <div className="flex justify-between text-[10px] text-gray-400 dark:text-gray-300 mb-1 font-medium">
-                              <span className="flex items-center gap-1"><ListChecks size={12}/> Tiến độ</span>
-                              <span>{Math.round(progress)}%</span>
-                           </div>
-                           <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                              <div className="h-full bg-orange-500 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
-                           </div>
-                        </div>
-                      )}
-                   </div>
-
-                   <div className="flex flex-col gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleToggleComplete(task); }}
-                        className={`p-2 rounded-full ${task.completed ? 'text-green-500 bg-green-50 dark:bg-green-900/30' : 'text-gray-300 dark:text-gray-400 hover:text-green-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
-                      >
-                         {task.completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}
-                      </button>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }}
-                        className="p-2 text-gray-300 dark:text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full"
-                      >
-                         <Trash2 size={20} />
-                      </button>
-                   </div>
-                </div>
-             </div>
-           );
-        }
-
-        const renderGroup = (title: string, groupTasks: Task[], icon: React.ReactNode, colorClass: string, isSticky: boolean = true) => {
-          if (groupTasks.length === 0) return (
-             <div className="hidden lg:block opacity-50 text-sm text-gray-400 dark:text-gray-400 text-center py-4 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
-                Không có việc {title.toLowerCase()}
-             </div>
-          );
-          return (
-            <div className="mb-6 lg:mb-0 animate-in fade-in slide-in-from-bottom-2 duration-500 h-full">
-               <div className={`${isSticky ? 'sticky top-[-1px]' : ''} z-10 bg-[#fff7ed]/95 dark:bg-[#0f172a]/95 backdrop-blur-sm py-2 flex items-center gap-2 font-bold text-sm uppercase tracking-wider mb-2 ${colorClass} border-b border-gray-100 dark:border-gray-700 lg:bg-transparent lg:border-none lg:text-base lg:mb-4`}>
-                  {icon} {title} <span className="text-xs opacity-70 font-normal ml-auto bg-white dark:bg-gray-700 px-2 py-0.5 rounded-full border dark:border-gray-600 shadow-sm">{groupTasks.length} việc</span>
-               </div>
-               <div className="lg:h-full lg:overflow-y-auto lg:pr-1 custom-scrollbar">
-                  {groupTasks.map(renderTaskCard)}
-               </div>
-            </div>
-          )
-        }
-
-        return (
-          <div className="h-full bg-[#fff7ed] dark:bg-gray-950 rounded-lg p-4 overflow-y-auto custom-scrollbar pb-32 lg:pb-4">
-             {sortedTasks.length === 0 ? (
-               <div className="text-center text-gray-400 dark:text-gray-300 py-20 flex flex-col items-center">
-                  <div className="bg-white dark:bg-gray-800 p-4 rounded-full shadow-sm mb-3">
-                    <CloudOff size={32} className="text-orange-300 dark:text-orange-700"/>
-                  </div>
-                  <p className="font-medium">Không tìm thấy công việc nào.</p>
-                  {selectedTagFilter ? (
-                    <p className="text-xs opacity-70 mt-1">Thử bỏ bộ lọc thẻ "{selectedTagFilter}" xem sao.</p>
-                  ) : (
-                    <p className="text-xs opacity-70 mt-1">Hãy thêm việc mới hoặc đồng bộ từ Telegram.</p>
-                  )}
-               </div>
-             ) : (
-               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 h-full items-start content-start">
-                  {/* Greeting takes full width */}
-                  {GreetingSection}
-
-                  {/* Column 1: Priority (Overdue + Today) */}
-                  <div className="flex flex-col gap-4 lg:bg-orange-50/50 dark:lg:bg-gray-900/50 lg:p-3 lg:rounded-2xl lg:border lg:border-orange-100 dark:lg:border-gray-800 lg:min-h-[500px]">
-                     {renderGroup("Quá hạn / Chưa xong", groups.overdue, <AlertCircle size={16}/>, "text-red-600 dark:text-red-400")}
-                     {renderGroup("Hôm nay", groups.today, <CalendarDays size={16}/>, "text-orange-600 dark:text-orange-400")}
-                  </div>
-
-                  {/* Column 2: Tomorrow */}
-                  <div className="flex flex-col gap-4 lg:bg-blue-50/50 dark:lg:bg-gray-900/50 lg:p-3 lg:rounded-2xl lg:border lg:border-blue-100 dark:lg:border-gray-800 lg:min-h-[500px]">
-                     {renderGroup("Ngày mai", groups.tomorrow, <ArrowRight size={16}/>, "text-blue-600 dark:text-blue-400")}
-                     
-                     {/* On Large Desktop (XL), Upcoming is in Col 3. On Laptop (LG), Upcoming is here in Col 2 */}
-                     <div className="block xl:hidden mt-4 pt-4 border-t border-blue-100 dark:border-blue-900 border-dashed">
-                        {renderGroup("Sắp tới", groups.upcoming, <CalendarPlus size={16}/>, "text-gray-600 dark:text-gray-400", false)}
-                     </div>
-                  </div>
-
-                  {/* Column 3: Upcoming (Visible only on XL screens) */}
-                  <div className="hidden xl:flex flex-col gap-4 bg-gray-50/50 dark:bg-gray-900/50 p-3 rounded-2xl border border-gray-100 dark:border-gray-800 min-h-[500px]">
-                     {renderGroup("Sắp tới", groups.upcoming, <CalendarPlus size={16}/>, "text-gray-600 dark:text-gray-400")}
-                  </div>
-               </div>
-             )}
-          </div>
-        );
-      case ViewMode.MONTH:
-      case ViewMode.WEEK:
-      case ViewMode.DAY:
-      default:
-        return (
-          <CalendarView 
-            currentDate={currentDate} 
-            viewMode={viewMode}
-            tasks={filteredTasks}
-            tags={tags}
-            onDeleteTask={handleDeleteTask}
-            onEditTask={openEditModal}
-            onToggleComplete={handleToggleComplete}
-            onMoveTask={handleMoveTask}
-            onSelectDate={handleDaySelect}
-          />
-        );
-    }
-  };
+  // If not logged in AND not in offline mode
+  if (!user && !isOfflineMode) {
+     return <LoginScreen onBypassAuth={() => { setIsOfflineMode(true); setUseFirebase(false); }} />;
+  }
 
   return (
     // Updated h-screen to supports-[height:100dvh]:h-[100dvh] for mobile browsers
@@ -984,21 +851,28 @@ const App: React.FC = () => {
       {/* Toast Container */}
       <Toast toasts={toasts} onRemove={removeToast} />
 
-      {/* Offline Banner */}
-      {!useFirebase && (
+      {/* Offline Banner or User Info */}
+      {!useFirebase ? (
         <div className="bg-stone-100 dark:bg-gray-800 border-b border-stone-200 dark:border-gray-700 text-stone-800 dark:text-gray-200 p-2 text-xs flex items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <WifiOff size={16} className="text-stone-500 dark:text-gray-400" />
             <div>
               <span className="font-bold">Đang chạy chế độ Offline.</span>
-              <span className="ml-1 text-stone-600 dark:text-gray-400 opacity-80">{firebaseError}</span>
+              <span className="ml-1 text-stone-600 dark:text-gray-400 opacity-80">{isOfflineMode ? "Dữ liệu lưu trên máy." : firebaseError}</span>
             </div>
           </div>
-          <button onClick={() => { setFirebaseError(null); setUseFirebase(true); }} className="bg-stone-200 dark:bg-gray-700 hover:bg-stone-300 px-3 py-1 rounded flex items-center gap-1">
-             <RefreshCw size={12} /> Kết nối lại
-          </button>
+          {!isOfflineMode && (
+            <button onClick={() => { setFirebaseError(null); setUseFirebase(true); }} className="bg-stone-200 dark:bg-gray-700 hover:bg-stone-300 px-3 py-1 rounded flex items-center gap-1">
+               <RefreshCw size={12} /> Kết nối lại
+            </button>
+          )}
+          {isOfflineMode && (
+             <button onClick={() => window.location.reload()} className="text-orange-600 dark:text-orange-400 hover:underline">
+               Đăng nhập
+             </button>
+          )}
         </div>
-      )}
+      ) : null}
 
       {/* Modern Glass Header */}
       <div className="bg-gradient-to-r from-orange-500/95 to-red-600/95 backdrop-blur-md text-white p-3 shadow-md z-30 flex-shrink-0 sticky top-0">
@@ -1037,7 +911,19 @@ const App: React.FC = () => {
              <button onClick={handleNext} className="hover:bg-white/20 p-1.5 rounded-full transition active:scale-90"><ChevronRight size={20} /></button>
           </div>
 
-          <div className="flex gap-2 sm:gap-3">
+          <div className="flex gap-2 sm:gap-3 items-center">
+             {/* User Info / Logout (Desktop) */}
+             <div className="hidden lg:flex items-center gap-2 mr-2 border-r border-white/20 pr-3">
+                {user?.photoURL ? (
+                  <img src={user.photoURL} alt="User" className="w-6 h-6 rounded-full border border-white/50" />
+                ) : (
+                  <User size={20} />
+                )}
+                <span className="text-xs font-medium max-w-[80px] truncate">
+                  {user?.displayName || (isOfflineMode ? 'Offline' : 'User')}
+                </span>
+             </div>
+
             {/* Dark Mode Toggle */}
              <button 
                 onClick={toggleTheme} 
@@ -1047,9 +933,24 @@ const App: React.FC = () => {
                {isDarkMode ? <Sun size={20} className="text-yellow-300" /> : <Moon size={20} className="text-white" />}
              </button>
 
-             {/* Settings Button: Hidden on Mobile, Visible on Desktop (lg:flex) */}
+             {/* Settings Button */}
             <button onClick={() => setIsSettingsOpen(true)} className="hidden lg:flex items-center gap-1 hover:bg-white/20 px-2 py-1.5 rounded-md transition text-xs font-semibold backdrop-blur-sm active:scale-95">
               <Settings size={20} /> <span className="hidden sm:inline">Cài đặt</span>
+            </button>
+            
+            {/* Logout Button (or Exit Offline) */}
+            <button 
+              onClick={() => {
+                if (isOfflineMode) {
+                  window.location.reload();
+                } else {
+                  logOut();
+                }
+              }} 
+              className="hover:bg-white/20 p-2 rounded-full transition text-xs font-semibold backdrop-blur-sm active:scale-95" 
+              title={isOfflineMode ? "Thoát chế độ Offline" : "Đăng xuất"}
+            >
+              <LogOut size={20} />
             </button>
           </div>
         </div>

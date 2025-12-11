@@ -1,5 +1,7 @@
+
 import firebase from "firebase/compat/app";
 import "firebase/compat/firestore";
+import "firebase/compat/auth";
 import { Task, RecurringType, Tag, DEFAULT_TASK_TAGS, Subtask } from "../types";
 
 // Cấu hình Firebase từ người dùng cung cấp
@@ -21,35 +23,53 @@ const app = !firebase.apps.length
 
 // Initialize Firestore (Compat Mode)
 const db = firebase.firestore(app);
+export const auth = firebase.auth(app);
+export const googleProvider = new firebase.auth.GoogleAuthProvider();
 
 const COLLECTION_NAME = "tasks";
-const CONFIG_COLLECTION = "config";
+// const CONFIG_COLLECTION = "config"; // Old global config
+const USERS_COLLECTION = "users";
+
+// --- AUTH ACTIONS ---
+export const signInWithGoogle = async () => {
+  try {
+    await auth.signInWithPopup(googleProvider);
+  } catch (error) {
+    console.error("Login failed", error);
+    throw error;
+  }
+};
+
+export const logOut = async () => {
+  try {
+    await auth.signOut();
+  } catch (error) {
+    console.error("Logout failed", error);
+  }
+};
 
 /**
  * Lắng nghe thay đổi dữ liệu realtime từ Firestore
- * @param callback Hàm callback nhận danh sách tasks mới
- * @param onError Hàm callback khi có lỗi kết nối
- * @returns Hàm unsubscribe để hủy lắng nghe
+ * CHỈ lấy dữ liệu của userId tương ứng
  */
 export const subscribeToTasks = (
+  userId: string,
   callback: (tasks: Task[]) => void,
   onError: (error: any) => void
 ) => {
-  // QUAN TRỌNG: Không dùng orderBy ở đây để tránh lỗi "The query requires an index".
-  // Chúng ta sẽ lấy dữ liệu về và sắp xếp ở phía Client (trình duyệt).
-  const q = db.collection(COLLECTION_NAME);
+  if (!userId) return () => {};
+
+  // Query: Lấy tasks where userId == userId
+  const q = db.collection(COLLECTION_NAME).where('userId', '==', userId);
   
   const unsubscribe = q.onSnapshot((querySnapshot) => {
     const tasks: Task[] = [];
     querySnapshot.forEach((doc) => {
-      // Ép kiểu dữ liệu trả về từ Firestore và sanitize để tránh lỗi Circular JSON
       const data = doc.data();
       
-      // Helper function để đảm bảo giá trị là string, tránh object/reference
       const safeString = (val: any) => (typeof val === 'string' ? val : '');
       const safeBoolean = (val: any) => !!val;
 
-      // Xử lý migration: Nếu dữ liệu cũ có isRecurring=true, gán thành 'daily'
       let recType: RecurringType = 'none';
       if (data.recurringType) {
         recType = data.recurringType as RecurringType;
@@ -57,7 +77,6 @@ export const subscribeToTasks = (
         recType = 'daily';
       }
 
-      // Sanitize subtasks
       let subtasks: Subtask[] = [];
       if (Array.isArray(data.subtasks)) {
         subtasks = data.subtasks.map((st: any) => ({
@@ -68,10 +87,11 @@ export const subscribeToTasks = (
       }
 
       const date = safeString(data.date) || new Date().toISOString().split('T')[0];
-      const endDate = safeString(data.endDate) || date; // Fallback endDate bằng date nếu không có
+      const endDate = safeString(data.endDate) || date;
 
       tasks.push({
         id: doc.id,
+        userId: data.userId, // Có thể có hoặc không
         title: safeString(data.title) || "Không có tiêu đề",
         date: date,
         endDate: endDate,
@@ -85,7 +105,7 @@ export const subscribeToTasks = (
       });
     });
 
-    // Sắp xếp dữ liệu ngay tại Client (Client-side sorting)
+    // Client-side sorting
     tasks.sort((a, b) => {
       const timeA = `${a.date} ${a.time}`;
       const timeB = `${b.date} ${b.time}`;
@@ -102,20 +122,22 @@ export const subscribeToTasks = (
 };
 
 /**
- * Lắng nghe thay đổi Tag từ Firestore
+ * Lắng nghe thay đổi Tag từ Firestore (User specific)
+ * Path: users/{userId}/config/tags
  */
 export const subscribeToTags = (
+  userId: string,
   callback: (tags: Tag[]) => void,
   onError: (error: any) => void
 ) => {
-  const docRef = db.collection(CONFIG_COLLECTION).doc("tags");
+  if (!userId) return () => {};
+
+  const docRef = db.collection(USERS_COLLECTION).doc(userId).collection("config").doc("tags");
   
   const unsubscribe = docRef.onSnapshot((docSnap) => {
-    // Trong Firestore compat/v8, .exists là property boolean, không phải function
     if (docSnap.exists) {
       const data = docSnap.data();
       if (data && data.list && Array.isArray(data.list)) {
-        // Sanitize tags to avoid circular structure errors (e.g., DocumentReference)
         const sanitizedTags = data.list.map((t: any) => ({
           name: typeof t.name === 'string' ? t.name : "Thẻ lỗi",
           color: typeof t.color === 'string' ? t.color : "bg-gray-100 border-gray-300 text-gray-800",
@@ -126,7 +148,7 @@ export const subscribeToTags = (
         callback(DEFAULT_TASK_TAGS);
       }
     } else {
-      // Nếu chưa có config trên server, trả về default nhưng KHÔNG tự ghi đè lên server ở đây để tránh race condition
+      // Nếu user chưa có config riêng, trả về default (không tự ghi đè để tiết kiệm write)
       callback(DEFAULT_TASK_TAGS);
     }
   }, (error: any) => {
@@ -138,13 +160,13 @@ export const subscribeToTags = (
 };
 
 /**
- * Lưu danh sách Tag lên Firestore
+ * Lưu danh sách Tag lên Firestore (User specific)
  */
-export const saveTagsToFirestore = async (tags: Tag[]) => {
+export const saveTagsToFirestore = async (userId: string, tags: Tag[]) => {
+  if (!userId) throw new Error("User not authenticated");
   try {
-    const docRef = db.collection(CONFIG_COLLECTION).doc("tags");
+    const docRef = db.collection(USERS_COLLECTION).doc(userId).collection("config").doc("tags");
     
-    // Sanitize: Tạo object mới sạch sẽ, loại bỏ undefined, đảm bảo đúng format
     const sanitizedTags = tags.map(t => ({
       name: t.name || "Thẻ mới",
       color: t.color || "bg-gray-100 border-gray-300 text-gray-800",
@@ -152,7 +174,6 @@ export const saveTagsToFirestore = async (tags: Tag[]) => {
     }));
 
     await docRef.set({ list: sanitizedTags }, { merge: true });
-    console.log("Firebase: Saved tags successfully", sanitizedTags);
     return true;
   } catch (e) {
     console.error("Firebase: Error saving tags", e);
@@ -161,14 +182,19 @@ export const saveTagsToFirestore = async (tags: Tag[]) => {
 };
 
 /**
- * Thêm công việc mới vào Firestore
+ * Thêm công việc mới vào Firestore (Có userId)
  */
 export const addTaskToFirestore = async (task: Omit<Task, 'id'>) => {
+  if (!task.userId) {
+     console.warn("Attempted to add task without userId. Fallback to offline mode might happen.");
+     // Vẫn cho phép add nhưng sẽ không query lại được nếu bật rule security chặt
+  }
   try {
     await db.collection(COLLECTION_NAME).add({
+      userId: task.userId, // Quan trọng: Lưu ID người dùng
       title: task.title,
       date: task.date,
-      endDate: task.endDate || task.date, // Lưu endDate
+      endDate: task.endDate || task.date,
       time: task.time,
       description: task.description || "",
       completed: task.completed,
@@ -176,12 +202,12 @@ export const addTaskToFirestore = async (task: Omit<Task, 'id'>) => {
       recurringType: task.recurringType || 'none',
       tag: task.tag || 'Khác',
       subtasks: task.subtasks || [],
-      createdAt: firebase.firestore.FieldValue.serverTimestamp() // Sử dụng thời gian của server
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     return true;
   } catch (e) {
     console.warn("Fallback to offline: Could not add to Firestore", e);
-    throw e; // Ném lỗi để App xử lý fallback
+    throw e;
   }
 };
 
@@ -191,11 +217,10 @@ export const addTaskToFirestore = async (task: Omit<Task, 'id'>) => {
 export const updateTaskInFirestore = async (task: Task) => {
   try {
     const taskRef = db.collection(COLLECTION_NAME).doc(task.id);
-    // Loại bỏ id khỏi data object khi update
     const { id, isRecurring, ...dataToUpdate } = task; 
     await taskRef.update({
         ...dataToUpdate,
-        endDate: task.endDate || task.date, // Đảm bảo update endDate
+        endDate: task.endDate || task.date,
         recurringType: task.recurringType || 'none',
         subtasks: task.subtasks || []
     });

@@ -15,6 +15,7 @@ export interface Subtask {
 
 export interface Task {
   id: string;
+  userId?: string; // ID của người tạo task
   title: string;
   date: string; // Format: YYYY-MM-DD (Ngày bắt đầu)
   endDate?: string; // Format: YYYY-MM-DD (Ngày kết thúc - New)
