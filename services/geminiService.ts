@@ -4,15 +4,21 @@ import { Task } from "../types";
 
 // Hàm khởi tạo AI
 const getAiClient = () => {
-  // Use process.env.API_KEY exclusively as per guidelines.
-  // The key's availability is handled externally.
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Chỉ lấy từ LocalStorage (Người dùng tự nhập trên giao diện)
+  const apiKey = localStorage.getItem('gemini_api_key');
+  
+  if (!apiKey) {
+    // Trả về null để UI xử lý hiển thị thông báo yêu cầu nhập key
+    return null;
+  }
+  return new GoogleGenAI({ apiKey });
 };
 
 export const parseTaskWithGemini = async (input: string, availableTags: string[]): Promise<{ title: string; date: string; endDate: string; time: string; description: string; recurringType: string; tag: string } | null> => {
   try {
     const ai = getAiClient();
-    
+    if (!ai) throw new Error("Vui lòng nhập API Key Gemini trong phần Cài đặt.");
+
     const today = new Date().toISOString().split('T')[0];
     const dayOfWeek = new Date().getDay(); // 0-6
     
@@ -78,7 +84,8 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
 export const generateReport = async (tasks: Task[], range: string): Promise<string> => {
   try {
     const ai = getAiClient();
-    
+    if (!ai) return "<p style='color:red'>Chưa cấu hình API Key. Vui lòng vào Cài đặt để nhập key.</p>";
+
     const tasksData = tasks.map(t => ({
       title: t.title,
       date: t.date,

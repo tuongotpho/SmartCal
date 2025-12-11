@@ -10,7 +10,7 @@
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/thanhlv87/pic/refs/heads/main/august.png">
     
-    <!-- Tailwind CSS CDN (Giữ lại để đơn giản hóa config, hoặc bạn có thể cài full tailwind nếu muốn) -->
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -20,15 +20,13 @@
         background-color: #fff7ed; 
         overscroll-behavior-y: none;
         -webkit-tap-highlight-color: transparent;
-      } /* Orange-50 */
+      }
       
-      /* Custom scrollbar for aesthetics */
       ::-webkit-scrollbar { width: 4px; height: 4px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #fdba74; border-radius: 4px; } /* Orange-300 */
-      ::-webkit-scrollbar-thumb:hover { background: #fb923c; } /* Orange-400 */
+      ::-webkit-scrollbar-thumb { background: #fdba74; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #fb923c; }
       
-      /* Hide scrollbar for mobile nav */
       .no-scrollbar::-webkit-scrollbar {
         display: none;
       }
@@ -40,15 +38,15 @@
   <script type="importmap">
 {
   "imports": {
-    "lucide-react": "https://esm.sh/lucide-react@^0.559.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "@google/genai": "https://esm.sh/@google/genai@^1.32.0",
-    "react/": "https://esm.sh/react@^19.2.1/",
     "react": "https://esm.sh/react@^19.2.1",
-    "vite": "https://esm.sh/vite@^7.2.7",
     "react-dom/": "https://esm.sh/react-dom@^19.2.1/",
+    "react/": "https://esm.sh/react@^19.2.1/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.32.0",
+    "date-fns": "https://esm.sh/date-fns@^4.1.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.559.0",
     "firebase/": "https://esm.sh/firebase@^12.6.0/",
-    "date-fns": "https://esm.sh/date-fns@^4.1.0"
+    "vite": "https://esm.sh/vite@^7.2.7",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>

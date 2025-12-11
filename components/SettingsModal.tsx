@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { TelegramConfig, Tag, COLOR_PALETTES } from '../types';
-import { X, Save, Key, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown } from 'lucide-react';
+import { X, Save, Key, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Sparkles } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 import { ToastType } from './Toast';
 
@@ -35,6 +35,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [activeTab, setActiveTab] = useState<'general' | 'tags'>('general');
   const [newTagName, setNewTagName] = useState('');
   
+  // Gemini Key State
+  const [geminiKey, setGeminiKey] = useState('');
+  
   // Custom Dropdown State
   const [newTagColorKey, setNewTagColorKey] = useState('Gray');
   const [isColorDropdownOpen, setIsColorDropdownOpen] = useState(false);
@@ -46,6 +49,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     setConfig(telegramConfig);
     setCurrentTags(tags);
+    // Load Gemini Key từ LocalStorage khi mở modal
+    setGeminiKey(localStorage.getItem('gemini_api_key') || '');
   }, [telegramConfig, tags, isOpen]);
 
   // Click outside to close custom dropdown
@@ -89,6 +94,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  // Helper để hiển thị masked key
+  const formatKeyDisplay = (key: string) => {
+    if (!key) return '';
+    if (key.length < 8) return '********';
+    return key.substring(0, 4) + '...' + key.substring(key.length - 4);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -121,7 +133,30 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
           {activeTab === 'general' ? (
             <div className="space-y-6">
-              
+              {/* Gemini Config */}
+              <div className="space-y-3">
+                 <h3 className="text-gray-800 font-semibold text-sm flex items-center gap-2 border-b pb-2">
+                  <Sparkles size={16} className="text-orange-500" /> Cấu hình Gemini AI
+                </h3>
+                
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">API Key (Google AI Studio)</label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      value={geminiKey}
+                      onChange={(e) => setGeminiKey(e.target.value)}
+                      placeholder="Nhập API Key để kích hoạt AI"
+                      style={{ colorScheme: 'light' }}
+                      className="w-full bg-white text-gray-900 border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none pr-10"
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    Key được lưu trên trình duyệt của bạn (LocalStorage). Lấy key tại <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-orange-600 underline">aistudio.google.com</a>
+                  </p>
+                </div>
+              </div>
+
               <div className="space-y-4">
                 <h3 className="text-gray-800 font-semibold text-sm flex items-center gap-2 border-b pb-2">
                   <MessageSquare size={16} className="text-blue-500" /> Cấu hình Telegram Bot
@@ -274,7 +309,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             onClick={() => {
               onSaveConfig(config);
               onSaveTags(currentTags);
-              showToast("Đã lưu cấu hình thành công!", "success");
+              // Lưu Gemini Key
+              if (geminiKey) {
+                localStorage.setItem('gemini_api_key', geminiKey);
+                showToast("Đã lưu cấu hình & API Key!", "success");
+              } else {
+                localStorage.removeItem('gemini_api_key');
+                 showToast("Đã lưu cấu hình (Không có API Key)", "info");
+              }
               onClose();
             }}
             className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition shadow-md text-sm font-medium"
