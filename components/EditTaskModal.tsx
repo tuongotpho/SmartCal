@@ -195,7 +195,6 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="VD: Họp team vào 9h sáng mai"
-                  style={{ colorScheme: 'light' }}
                   className="flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
                   autoFocus={formData.id === 'temp'}
                 />
@@ -230,7 +229,6 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                     type="date"
                     value={formData.date}
                     onChange={handleStartDateChange}
-                    style={{ colorScheme: 'light' }}
                     className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
                   />
                 </div>
@@ -246,7 +244,6 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                     min={formData.date}
                     value={formData.endDate || formData.date}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    style={{ colorScheme: 'light' }}
                     className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
                   />
                 </div>
@@ -261,7 +258,6 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                   type="time"
                   value={formData.time}
                   onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                  style={{ colorScheme: 'light' }}
                   className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
                 />
              </div>
@@ -276,14 +272,13 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                <select
                   value={formData.recurringType || 'none'}
                   onChange={(e) => setFormData({ ...formData, recurringType: e.target.value as RecurringType })}
-                  style={{ colorScheme: 'light' }}
                   className="w-full bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200 text-xs font-semibold rounded px-2 py-2.5 focus:ring-2 focus:ring-rose-500 outline-none cursor-pointer"
                >
-                  <option value="none">Không lặp lại</option>
-                  <option value="daily">Hàng ngày</option>
-                  <option value="weekly">Hàng tuần</option>
-                  <option value="monthly">Hàng tháng</option>
-                  <option value="yearly">Hàng năm</option>
+                  <option value="none" className="bg-white dark:bg-gray-800">Không lặp lại</option>
+                  <option value="daily" className="bg-white dark:bg-gray-800">Hàng ngày</option>
+                  <option value="weekly" className="bg-white dark:bg-gray-800">Hàng tuần</option>
+                  <option value="monthly" className="bg-white dark:bg-gray-800">Hàng tháng</option>
+                  <option value="yearly" className="bg-white dark:bg-gray-800">Hàng năm</option>
                </select>
             </div>
 
@@ -295,11 +290,10 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                <select
                   value={formData.tag || 'Khác'}
                   onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
-                  style={{ colorScheme: 'light' }}
                   className="w-full bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200 text-xs font-semibold rounded px-2 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
                >
                   {tags.map(t => (
-                    <option key={t.name} value={t.name}>{t.name}</option>
+                    <option key={t.name} value={t.name} className="bg-white dark:bg-gray-800">{t.name}</option>
                   ))}
                </select>
             </div>
@@ -326,7 +320,6 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
               rows={2}
               value={formData.description || ''}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              style={{ colorScheme: 'light' }}
               className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none"
             />
           </div>
@@ -343,7 +336,6 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                 value={newSubtaskTitle}
                 onChange={(e) => setNewSubtaskTitle(e.target.value)}
                 placeholder="Thêm bước nhỏ..."
-                style={{ colorScheme: 'light' }}
                 className="flex-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded px-3 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
                 onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()}
               />

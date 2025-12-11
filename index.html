@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="vi" class="scroll-smooth">
   <head>
@@ -39,11 +40,36 @@
         transition: background-color 0.3s ease;
       }
 
-      /* Dark mode body background override */
+      /* Dark mode overrides */
+      html.dark {
+        color-scheme: dark; /* Quan trọng: Báo cho trình duyệt render các control native (select, date picker) theo dark mode */
+      }
+      
       html.dark body {
         background-color: #0f172a; /* Slate 950 */
         color: #e2e8f0; /* Slate 200 */
       }
+
+      /* --- FIX: Date Picker Icon Visibility --- */
+      /* Light Mode: Force dark icon */
+      input[type="date"]::-webkit-calendar-picker-indicator,
+      input[type="time"]::-webkit-calendar-picker-indicator {
+        filter: invert(0);
+        cursor: pointer;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+      }
+      input[type="date"]::-webkit-calendar-picker-indicator:hover,
+      input[type="time"]::-webkit-calendar-picker-indicator:hover {
+        opacity: 1;
+      }
+      
+      /* Dark Mode: Force white icon */
+      html.dark input[type="date"]::-webkit-calendar-picker-indicator,
+      html.dark input[type="time"]::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+      }
+      /* ---------------------------------------- */
       
       ::-webkit-scrollbar { width: 4px; height: 4px; }
       ::-webkit-scrollbar-track { background: transparent; }

@@ -146,7 +146,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={geminiKey}
                       onChange={(e) => setGeminiKey(e.target.value)}
                       placeholder="Nhập API Key để kích hoạt AI"
-                      style={{ colorScheme: 'light' }}
                       className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none pr-10"
                     />
                   </div>
@@ -169,7 +168,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={config.botToken}
                       onChange={(e) => setConfig({ ...config, botToken: e.target.value })}
                       placeholder="123456789:ABCdef..."
-                      style={{ colorScheme: 'light' }}
                       className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
                     />
                     <p className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">Lấy từ @BotFather trên Telegram.</p>
@@ -182,7 +180,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={config.chatId}
                       onChange={(e) => setConfig({ ...config, chatId: e.target.value })}
                       placeholder="-987654321 hoặc ID cá nhân"
-                      style={{ colorScheme: 'light' }}
                       className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
                     />
                     <p className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">ID của nhóm hoặc cá nhân nhận thông báo.</p>
@@ -232,7 +229,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     value={newTagName}
                     onChange={(e) => setNewTagName(e.target.value)}
                     placeholder="VD: Dự án A" 
-                    style={{ colorScheme: 'light' }}
                     className="w-full text-sm p-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                   />
                 </div>

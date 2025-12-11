@@ -21,7 +21,9 @@ import {
   differenceInDays, 
   add,
   startOfMonth,
-  startOfWeek
+  startOfWeek,
+  parse,
+  isValid
 } from 'date-fns';
 import { 
   Settings, 
@@ -61,7 +63,12 @@ import {
   Moon,
   Sun,
   LogOut,
-  User
+  User,
+  PenLine,
+  Keyboard,
+  Calendar,
+  Tag as TagIcon,
+  AlignLeft
 } from 'lucide-react';
 import CalendarView from './components/CalendarView';
 import StatsView from './components/StatsView';
@@ -71,7 +78,7 @@ import ConfirmModal from './components/ConfirmModal';
 import DatePickerPopover from './components/DatePickerPopover';
 import LoginScreen from './components/LoginScreen';
 import Toast, { ToastMessage, ToastType } from './components/Toast';
-import { Task, TelegramConfig, ViewMode, RecurringType, Tag, DEFAULT_TASK_TAGS } from './types';
+import { Task, TelegramConfig, ViewMode, RecurringType, Tag, DEFAULT_TASK_TAGS, Subtask } from './types';
 import { parseTaskWithGemini, generateReport } from './services/geminiService';
 import { sendTelegramMessage, fetchTelegramUpdates, formatTaskForTelegram } from './services/telegramService';
 import { subscribeToTasks, subscribeToTags, saveTagsToFirestore, addTaskToFirestore, deleteTaskFromFirestore, updateTaskInFirestore, auth, logOut } from './services/firebase';
@@ -121,6 +128,21 @@ const App: React.FC = () => {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<any>(null); // Timer để tự động ngắt khi im lặng
+
+  // Sidebar Tabs State
+  const [sidebarTab, setSidebarTab] = useState<'ai' | 'manual'>('manual');
+  
+  // Manual Input State - Extended
+  const [manualForm, setManualForm] = useState({
+    title: '',
+    date: format(new Date(), 'yyyy-MM-dd'),
+    endDate: format(new Date(), 'yyyy-MM-dd'),
+    time: '08:00',
+    tag: 'Khác',
+    recurringType: 'none' as RecurringType,
+    description: '',
+    checklistText: '' // New: For parsing simple checklist
+  });
 
   // Toast State
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -515,7 +537,6 @@ const App: React.FC = () => {
   // Mở modal tạo công việc mới (Reset form)
   const handleCreateNewTask = () => {
     const now = new Date();
-    // Sử dụng currentDate nếu người dùng đang ở ngày khác, hoặc ngày hiện tại
     const targetDate = format(currentDate, 'yyyy-MM-dd');
     
     const newTask: Task = {
@@ -541,175 +562,204 @@ const App: React.FC = () => {
     setViewMode(ViewMode.DAY);
   };
 
-  // --- Navigation & View Logic ---
-  const handlePrev = useCallback(() => {
-    if (viewMode === ViewMode.DAY) {
-      setCurrentDate(prev => addDays(prev, -1));
-    } else if (viewMode === ViewMode.WEEK) {
-      setCurrentDate(prev => addWeeks(prev, -1));
-    } else {
-      setCurrentDate(prev => addMonths(prev, -1));
+  // --- Manual Add Logic ---
+  const handleManualSubmit = async () => {
+    if (!manualForm.title.trim()) {
+      showToast("Vui lòng nhập tiêu đề công việc", "warning");
+      return;
     }
-  }, [viewMode]);
+    if (!manualForm.date) {
+      showToast("Vui lòng chọn ngày", "warning");
+      return;
+    }
 
-  const handleNext = useCallback(() => {
-    if (viewMode === ViewMode.DAY) {
-      setCurrentDate(prev => addDays(prev, 1));
-    } else if (viewMode === ViewMode.WEEK) {
-      setCurrentDate(prev => addWeeks(prev, 1));
-    } else {
-      setCurrentDate(prev => addMonths(prev, 1));
+    // Process Checklist
+    let subtasks: Subtask[] = [];
+    if (manualForm.checklistText.trim()) {
+        subtasks = manualForm.checklistText.split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .map(line => ({
+                id: Date.now().toString() + Math.random().toString(),
+                title: line,
+                completed: false
+            }));
     }
-  }, [viewMode]);
 
-  const getHeaderText = useMemo(() => {
-    if (viewMode === ViewMode.DAY) {
-      return format(currentDate, 'dd/MM/yyyy');
-    }
-    if (viewMode === ViewMode.WEEK) {
-      const start = startOfWeek(currentDate, { weekStartsOn: 1 });
-      const end = endOfWeek(currentDate, { weekStartsOn: 1 });
-      return `Tuần ${getWeek(currentDate, { weekStartsOn: 1 })} (${format(start, 'dd/MM')} - ${format(end, 'dd/MM')})`;
-    }
-    return `Tháng ${format(currentDate, 'MM/yyyy')}`;
-  }, [viewMode, currentDate]);
+    const newTask: Task = {
+      id: "temp",
+      userId: user?.uid || (isOfflineMode ? 'offline_user' : undefined),
+      title: manualForm.title.trim(),
+      date: manualForm.date,
+      endDate: manualForm.endDate || manualForm.date,
+      time: manualForm.time || "08:00",
+      description: manualForm.description.trim() || "Tạo thủ công",
+      completed: false,
+      reminderSent: false,
+      recurringType: manualForm.recurringType,
+      tag: manualForm.tag,
+      subtasks: subtasks
+    };
 
-  const renderContent = useCallback(() => {
-    if (viewMode === ViewMode.STATS) {
-      return <StatsView currentDate={currentDate} tasks={filteredTasks} tags={tags} />;
-    }
+    await handleAddTask(newTask);
     
-    if (viewMode === ViewMode.LIST) {
-      const sortedTasks = [...filteredTasks].sort((a,b) => {
-        const dateA = new Date(`${a.date}T${a.time}`);
-        const dateB = new Date(`${b.date}T${b.time}`);
-        return dateA.getTime() - dateB.getTime();
-      });
+    // Reset form mostly, but maybe keep date/tag context for rapid entry?
+    setManualForm({ 
+        ...manualForm, 
+        title: '', 
+        description: '', 
+        checklistText: '' 
+    }); 
+    showToast("Đã tạo công việc!", "success");
+  };
 
-      return (
-        <div className="h-full overflow-y-auto p-2 sm:p-4 bg-white dark:bg-gray-900 pb-32 lg:pb-0 custom-scrollbar">
-          <h3 className="font-bold mb-3 text-orange-800 dark:text-orange-400 flex items-center gap-2 sticky top-0 bg-white dark:bg-gray-900 py-2 z-10 border-b border-gray-100 dark:border-gray-800">
-             <ListChecks size={20}/> Danh sách công việc
-          </h3>
-          <div className="space-y-3">
-            {sortedTasks.length === 0 && (
-              <div className="text-center py-10 text-gray-400 flex flex-col items-center">
-                <Sparkles size={40} className="mb-2 opacity-50"/>
-                <p>Không có công việc nào trong danh sách.</p>
-              </div>
-            )}
-            {sortedTasks.map(task => {
-              const tagConfig = tags.find(t => t.name === task.tag) || tags.find(t => t.name === 'Khác');
-              return (
-                <div 
-                  key={task.id} 
-                  onClick={() => openEditModal(task)}
-                  className={`p-3 rounded-lg border-l-4 shadow-sm bg-white dark:bg-gray-800 flex items-start gap-3 cursor-pointer hover:shadow-md transition group
-                    ${task.completed 
-                      ? 'border-gray-300 dark:border-gray-600 opacity-60' 
-                      : (tagConfig?.color.split(' ')[1] || 'border-orange-400')}
-                  `}
-                >
-                  <button onClick={(e) => { e.stopPropagation(); handleToggleComplete(task); }} className={`mt-1 flex-shrink-0 ${task.completed ? 'text-green-500' : 'text-gray-300 group-hover:text-green-500'}`}>
-                    {task.completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
-                      <h4 className={`font-semibold text-sm sm:text-base truncate ${task.completed ? 'line-through text-gray-500' : 'text-gray-800 dark:text-gray-200'}`}>{task.title}</h4>
-                      <span className="text-[10px] sm:text-xs font-medium text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full whitespace-nowrap ml-2">
-                        {task.date}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      <span className="flex items-center gap-1 font-mono"><Clock size={12}/> {task.time}</span>
-                      {task.tag && (
-                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-700">
-                          <span className={`w-1.5 h-1.5 rounded-full ${tagConfig?.dot}`}></span> {task.tag}
-                        </span>
-                      )}
-                      {task.recurringType !== 'none' && <Repeat size={12} className="text-blue-500"/>}
-                    </div>
-                    {task.description && <p className="text-xs text-gray-400 mt-1 line-clamp-1">{task.description}</p>}
-                  </div>
-                  <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition"><Trash2 size={16}/></button>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      );
+  // --- Quick Add Logic with Manual Parser Fallback ---
+  
+  // Hàm phân tích thủ công (Rule-based)
+  const parseManualInput = (input: string): { title: string; date: string; time: string } => {
+    let text = input;
+    const now = new Date();
+    let targetDate = now;
+    let targetTime = format(now, "HH:mm");
+
+    // 1. Phân tích giờ (HH:mm hoặc HHhMM hoặc HH giờ)
+    // Regex: tìm số giờ (1-2 chữ số) theo sau là :, h, giờ và số phút tùy chọn
+    const timeRegex = /(?:lúc\s+)?(\d{1,2})[:h](\d{2})?(?:\s*(?:sáng|chiều|tối))?/i;
+    const timeMatch = text.match(timeRegex);
+
+    if (timeMatch) {
+        let hours = parseInt(timeMatch[1], 10);
+        let minutes = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+        const period = (timeMatch[0].toLowerCase().match(/chiều|tối/) && hours < 12) ? 'pm' : 'am';
+        
+        if (period === 'pm') hours += 12;
+        // Chuẩn hóa giờ phút
+        if (hours >= 24) hours = 23;
+        if (minutes >= 60) minutes = 59;
+        
+        targetTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        // Xóa phần thời gian khỏi text
+        text = text.replace(timeMatch[0], "").trim();
+    } else {
+        // Nếu không có giờ cụ thể, mặc định là 08:00 nếu là ngày khác, hoặc giữ nguyên giờ hiện tại
+        targetTime = "08:00";
     }
 
-    return (
-      <CalendarView 
-        currentDate={currentDate}
-        viewMode={viewMode}
-        tasks={filteredTasks}
-        tags={tags}
-        onDeleteTask={handleDeleteTask}
-        onEditTask={openEditModal}
-        onToggleComplete={handleToggleComplete}
-        onMoveTask={handleMoveTask}
-        onSelectDate={handleDaySelect}
-      />
-    );
-  }, [viewMode, currentDate, filteredTasks, tags, openEditModal, handleToggleComplete, handleDeleteTask, handleMoveTask]);
+    // 2. Phân tích ngày
+    // Keywords
+    const lowerText = text.toLowerCase();
+    let dateFound = false;
+
+    if (lowerText.includes("hôm nay") || lowerText.includes("nay")) {
+        targetDate = now;
+        text = text.replace(/hôm nay|nay/gi, "").trim();
+        dateFound = true;
+    } else if (lowerText.includes("ngày mai") || lowerText.includes("mai")) {
+        targetDate = addDays(now, 1);
+        text = text.replace(/ngày mai|mai/gi, "").trim();
+        dateFound = true;
+    } else if (lowerText.includes("ngày kia") || lowerText.includes("mốt")) {
+        targetDate = addDays(now, 2);
+        text = text.replace(/ngày kia|mốt/gi, "").trim();
+        dateFound = true;
+    }
+
+    // Regex Date dd/MM(/yyyy)
+    if (!dateFound) {
+        const dateRegex = /(?:ngày\s+)?(\d{1,2})[/-](\d{1,2})(?:[/-](\d{4}))?/;
+        const dateMatch = text.match(dateRegex);
+        if (dateMatch) {
+            const day = parseInt(dateMatch[1], 10);
+            const month = parseInt(dateMatch[2], 10) - 1; // 0-based
+            let year = dateMatch[3] ? parseInt(dateMatch[3], 10) : now.getFullYear();
+            
+            // Nếu năm chỉ có 2 chữ số (vd: 24 -> 2024)
+            if (year < 100) year += 2000;
+
+            const parsedDate = new Date(year, month, day);
+            if (isValid(parsedDate)) {
+                targetDate = parsedDate;
+                text = text.replace(dateMatch[0], "").trim();
+            }
+        }
+    }
+
+    // Xóa các từ nối dư thừa
+    text = text.replace(/\s+(vào|lúc)\s*$/i, "").replace(/^\s*(vào|lúc)\s+/i, "").trim();
+    
+    // Nếu tiêu đề trống sau khi cắt, dùng input gốc (trừ khi input gốc cũng chỉ là ngày giờ)
+    if (!text) text = "Công việc mới";
+
+    return {
+        title: text,
+        date: format(targetDate, 'yyyy-MM-dd'),
+        time: targetTime
+    };
+  };
 
   const handleQuickAdd = async () => {
     if (!quickInput.trim()) return;
+    setIsProcessingAI(true);
 
-    const simpleRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4}),\s*(.+),\s*(\d{1,2}:\d{2})$/;
-    const match = quickInput.match(simpleRegex);
+    try {
+        const apiKey = localStorage.getItem('gemini_api_key');
+        let taskData: { title: string; date: string; time: string; description?: string; tag?: string } | null = null;
+        let method = 'manual';
 
-    if (match) {
-      const [_, d, m, y, title, time] = match;
-      const fullYear = y.length === 2 ? `20${y}` : y;
-      const date = `${fullYear}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-      
-      const newTask: Task = {
-        id: "temp",
-        userId: user?.uid || (isOfflineMode ? 'offline_user' : undefined),
-        title: title.trim(),
-        date,
-        time,
-        description: "Tạo nhanh từ input",
-        completed: false,
-        reminderSent: false,
-        recurringType: 'none',
-        tag: 'Khác',
-        subtasks: []
-      };
-      await handleAddTask(newTask);
-      setQuickInput("");
-    } else {
-      try {
-        setIsProcessingAI(true);
-        const availableTags = tags.map(t => t.name);
-        const result = await parseTaskWithGemini(quickInput, availableTags);
-        if (result) {
-          const newTask: Task = {
-            id: "temp",
-            userId: user?.uid || (isOfflineMode ? 'offline_user' : undefined),
-            title: result.title,
-            date: result.date,
-            time: result.time,
-            description: result.description || "Tạo tự động bởi AI",
-            completed: false,
-            reminderSent: false,
-            recurringType: (result.recurringType as RecurringType) || 'none',
-            tag: result.tag || 'Khác',
-            subtasks: []
-          };
-          await handleAddTask(newTask);
-          setQuickInput("");
-        } else {
-          showToast("AI không hiểu được yêu cầu. Vui lòng nhập rõ ràng hơn.", "warning");
+        // 1. Ưu tiên dùng AI nếu có Key
+        if (apiKey) {
+            try {
+                const availableTags = tags.map(t => t.name);
+                const aiResult = await parseTaskWithGemini(quickInput, availableTags);
+                if (aiResult) {
+                    taskData = aiResult;
+                    method = 'ai';
+                }
+            } catch (error) {
+                console.warn("AI failed, falling back to manual parser", error);
+                // AI lỗi thì fall back xuống manual
+            }
         }
-      } catch (e) {
-        showToast("Lỗi khi xử lý AI. Kiểm tra cấu hình API Key.", "error");
-      } finally {
+
+        // 2. Nếu không có AI hoặc AI lỗi, dùng Manual Parser
+        if (!taskData) {
+            const manualResult = parseManualInput(quickInput);
+            taskData = {
+                ...manualResult,
+                description: "Tạo nhanh (Không dùng AI)",
+                tag: 'Khác' // Manual không tự phân loại được
+            };
+            method = 'manual';
+        }
+
+        if (taskData) {
+             const newTask: Task = {
+                id: "temp",
+                userId: user?.uid || (isOfflineMode ? 'offline_user' : undefined),
+                title: taskData.title,
+                date: taskData.date,
+                time: taskData.time,
+                description: taskData.description || (method === 'ai' ? "Tạo tự động bởi AI" : "Tạo nhanh"),
+                completed: false,
+                reminderSent: false,
+                recurringType: (taskData as any).recurringType || 'none', // AI có thể trả về recurring
+                tag: taskData.tag || 'Khác',
+                subtasks: []
+              };
+              await handleAddTask(newTask);
+              setQuickInput("");
+              
+              if (method === 'manual' && apiKey) {
+                  showToast("Đã tạo việc (AI gặp lỗi nên dùng chế độ thường)", "info");
+              } else if (method === 'manual') {
+                  showToast("Đã tạo việc (Chế độ không AI)", "success");
+              }
+        }
+
+    } catch (e) {
+        showToast("Lỗi không xác định khi tạo công việc.", "error");
+    } finally {
         setIsProcessingAI(false);
-      }
     }
   };
 
@@ -830,6 +880,111 @@ const App: React.FC = () => {
     }, 60 * 1000); // 1 minute auto-sync
     return () => clearInterval(intervalId);
   }, [telegramConfig, tasks, lastTelegramUpdateId, user, isOfflineMode]);
+
+  const handlePrev = useCallback(() => {
+    if (viewMode === ViewMode.WEEK) {
+      setCurrentDate(prev => addWeeks(prev, -1));
+    } else if (viewMode === ViewMode.DAY) {
+      setCurrentDate(prev => addDays(prev, -1));
+    } else {
+      setCurrentDate(prev => addMonths(prev, -1));
+    }
+  }, [viewMode]);
+
+  const handleNext = useCallback(() => {
+    if (viewMode === ViewMode.WEEK) {
+      setCurrentDate(prev => addWeeks(prev, 1));
+    } else if (viewMode === ViewMode.DAY) {
+      setCurrentDate(prev => addDays(prev, 1));
+    } else {
+      setCurrentDate(prev => addMonths(prev, 1));
+    }
+  }, [viewMode]);
+
+  const getHeaderText = useMemo(() => {
+    if (viewMode === ViewMode.DAY) return format(currentDate, 'dd/MM/yyyy');
+    if (viewMode === ViewMode.WEEK) {
+      const start = startOfWeek(currentDate, { weekStartsOn: 1 });
+      const end = endOfWeek(currentDate, { weekStartsOn: 1 });
+      if (getMonth(start) === getMonth(end)) {
+         return `Tháng ${format(currentDate, 'MM/yyyy')}`;
+      }
+      return `${format(start, 'dd/MM')} - ${format(end, 'dd/MM')}`;
+    }
+    return `Tháng ${format(currentDate, 'MM/yyyy')}`;
+  }, [currentDate, viewMode]);
+
+  const renderContent = () => {
+    if (viewMode === ViewMode.STATS) {
+      return <StatsView currentDate={currentDate} tasks={tasks} tags={tags} />;
+    }
+
+    if (viewMode === ViewMode.LIST) {
+        // Sort by date descending
+        const sortedTasks = [...filteredTasks].sort((a, b) => {
+             const dateA = new Date(`${a.date}T${a.time}`);
+             const dateB = new Date(`${b.date}T${b.time}`);
+             return dateA.getTime() - dateB.getTime();
+        });
+
+        return (
+            <div className="flex flex-col h-full bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+                <div className="p-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 flex justify-between items-center">
+                    <h2 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                        <Layout size={18} className="text-orange-500"/> Tất cả công việc
+                    </h2>
+                    <span className="text-xs text-gray-500">{sortedTasks.length} công việc</span>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-2 pb-32 lg:pb-0 custom-scrollbar">
+                    {sortedTasks.map(task => {
+                        const tagConfig = tags.find(t => t.name === task.tag) || tags.find(t => t.name === 'Khác');
+                        return (
+                        <div key={task.id} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all group">
+                             <button onClick={() => handleToggleComplete(task)} className={`flex-shrink-0 ${task.completed ? 'text-green-500' : 'text-gray-300 dark:text-gray-600 hover:text-green-500'}`}>
+                                {task.completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+                             </button>
+                             <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openEditModal(task)}>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{task.time}</span>
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${task.completed ? 'bg-gray-100 text-gray-500' : (tagConfig?.color || 'bg-gray-100 text-gray-700')}`}>
+                                        {task.date}
+                                    </span>
+                                    {task.recurringType !== 'none' && <Repeat size={12} className="text-blue-500" />}
+                                    <span className={`w-2 h-2 rounded-full ${tagConfig?.dot}`}></span>
+                                </div>
+                                <h3 className={`font-semibold text-sm truncate ${task.completed ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200'}`}>{task.title}</h3>
+                                {task.description && <p className="text-xs text-gray-500 truncate">{task.description}</p>}
+                             </div>
+                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => openEditModal(task)} className="p-2 text-gray-400 hover:text-orange-500"><Edit3 size={16}/></button>
+                                <button onClick={() => handleDeleteTask(task.id)} className="p-2 text-gray-400 hover:text-red-500"><Trash2 size={16}/></button>
+                             </div>
+                        </div>
+                    )})}
+                    {sortedTasks.length === 0 && (
+                        <div className="text-center py-10 text-gray-400">
+                            <p>Chưa có công việc nào.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+      <CalendarView 
+        currentDate={currentDate}
+        viewMode={viewMode}
+        tasks={filteredTasks}
+        tags={tags}
+        onDeleteTask={handleDeleteTask}
+        onEditTask={openEditModal}
+        onToggleComplete={handleToggleComplete}
+        onMoveTask={handleMoveTask}
+        onSelectDate={handleDaySelect}
+      />
+    );
+  };
 
   // If loading auth state
   if (isAuthLoading) {
@@ -1028,27 +1183,165 @@ const App: React.FC = () => {
 
         {/* Sidebar */}
         <div className="hidden lg:flex w-[320px] bg-white dark:bg-gray-900 border-l border-orange-200 dark:border-gray-800 shadow-xl z-20 flex-col order-2 h-full">
-           {/* Quick Add */}
+           {/* Quick Add Area */}
            <div className="p-4 bg-orange-50 dark:bg-gray-800 border-b border-orange-200 dark:border-gray-700 flex-shrink-0">
               <h2 className="font-bold text-orange-800 dark:text-orange-400 flex items-center gap-2 mb-3">
-                <Sparkles size={16} className="text-orange-500" /> Thêm nhanh (AI)
+                <CalendarPlus size={16} className="text-orange-500" /> Thêm công việc mới
               </h2>
-              <div className="relative">
-                <textarea
-                  value={quickInput}
-                  onChange={(e) => setQuickInput(e.target.value)}
-                  placeholder="VD: Họp lúc 9h sáng mai... (Bấm mic để nói)"
-                  style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                  className="w-full border border-orange-200 dark:border-gray-600 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none min-h-[80px] resize-none shadow-inner bg-white dark:bg-gray-700 dark:text-white"
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleQuickAdd(); } }}
-                />
-                <button onClick={toggleVoiceInput} className={`absolute bottom-2 left-2 p-1.5 rounded-full transition-all shadow-sm ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-white dark:bg-gray-600 text-gray-500 dark:text-gray-300 hover:text-orange-600 border dark:border-gray-500'}`}>
-                  {isListening ? <MicOff size={14} /> : <Mic size={14} />}
-                </button>
-                <button onClick={handleQuickAdd} disabled={isProcessingAI || !quickInput.trim()} className={`absolute bottom-2 right-2 p-1.5 rounded-md transition-all shadow-sm ${isProcessingAI ? 'bg-gray-200 dark:bg-gray-600' : 'bg-orange-600 text-white'}`}>
-                  {isProcessingAI ? <RefreshCw size={14} className="animate-spin" /> : <ChevronRight size={14} />}
-                </button>
+              
+              {/* Tabs Switcher */}
+              <div className="flex gap-1 mb-3 bg-white dark:bg-gray-700 p-1 rounded-lg border border-orange-100 dark:border-gray-600 shadow-sm">
+                  <button 
+                    onClick={() => setSidebarTab('manual')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-md transition-all ${
+                      sidebarTab === 'manual' 
+                        ? 'bg-orange-100 dark:bg-gray-600 text-orange-700 dark:text-white shadow-sm' 
+                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    <PenLine size={12}/> Thủ công
+                  </button>
+                  <button 
+                    onClick={() => setSidebarTab('ai')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-md transition-all ${
+                      sidebarTab === 'ai' 
+                        ? 'bg-orange-100 dark:bg-gray-600 text-orange-700 dark:text-white shadow-sm' 
+                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    <Sparkles size={12}/> AI Nhập nhanh
+                  </button>
               </div>
+
+              {/* Tab Content */}
+              {sidebarTab === 'ai' ? (
+                /* AI Input Mode */
+                <div className="relative animate-in fade-in zoom-in-95 duration-200">
+                  <textarea
+                    value={quickInput}
+                    onChange={(e) => setQuickInput(e.target.value)}
+                    placeholder="VD: Họp 9h sáng mai... (Hỗ trợ giọng nói)"
+                    style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                    className="w-full border border-orange-200 dark:border-gray-600 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none min-h-[120px] resize-none shadow-inner bg-white dark:bg-gray-700 dark:text-white"
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleQuickAdd(); } }}
+                  />
+                  <button onClick={toggleVoiceInput} className={`absolute bottom-2 left-2 p-1.5 rounded-full transition-all shadow-sm ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-white dark:bg-gray-600 text-gray-500 dark:text-gray-300 hover:text-orange-600 border dark:border-gray-500'}`}>
+                    {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+                  </button>
+                  <button onClick={handleQuickAdd} disabled={isProcessingAI || !quickInput.trim()} className={`absolute bottom-2 right-2 p-1.5 rounded-md transition-all shadow-sm ${isProcessingAI ? 'bg-gray-200 dark:bg-gray-600' : 'bg-orange-600 text-white'}`}>
+                    {isProcessingAI ? <RefreshCw size={14} className="animate-spin" /> : <ChevronRight size={14} />}
+                  </button>
+                  <p className="text-[10px] text-gray-400 mt-2 italic text-center">
+                    * AI tự động nhận diện ngày giờ từ văn bản.
+                  </p>
+                </div>
+              ) : (
+                /* Manual Input Mode - Extended */
+                <div className="space-y-2.5 animate-in fade-in zoom-in-95 duration-200 max-h-[calc(100vh-320px)] overflow-y-auto custom-scrollbar pr-1">
+                   <div>
+                     <input 
+                        type="text"
+                        value={manualForm.title}
+                        onChange={(e) => setManualForm({...manualForm, title: e.target.value})}
+                        placeholder="Tiêu đề công việc"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
+                     />
+                   </div>
+                   
+                   {/* Date & Time Row */}
+                   <div className="grid grid-cols-2 gap-2">
+                       <div>
+                           <label className="text-[10px] font-bold text-gray-500 uppercase">Ngày bắt đầu</label>
+                           <input 
+                             type="date"
+                             value={manualForm.date}
+                             onChange={(e) => setManualForm({...manualForm, date: e.target.value})}
+                             className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
+                           />
+                       </div>
+                        <div>
+                           <label className="text-[10px] font-bold text-gray-500 uppercase">Ngày kết thúc</label>
+                           <input 
+                             type="date"
+                             min={manualForm.date}
+                             value={manualForm.endDate}
+                             onChange={(e) => setManualForm({...manualForm, endDate: e.target.value})}
+                             className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
+                           />
+                       </div>
+                   </div>
+
+                   {/* Time & Tag */}
+                   <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Giờ</label>
+                        <input 
+                          type="time"
+                          value={manualForm.time}
+                          onChange={(e) => setManualForm({...manualForm, time: e.target.value})}
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Phân loại</label>
+                        <select
+                            value={manualForm.tag}
+                            onChange={(e) => setManualForm({ ...manualForm, tag: e.target.value })}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
+                        >
+                            {tags.map(t => (
+                                <option key={t.name} value={t.name}>{t.name}</option>
+                            ))}
+                        </select>
+                      </div>
+                   </div>
+
+                   {/* Recurring */}
+                   <div>
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Lặp lại</label>
+                        <select
+                            value={manualForm.recurringType}
+                            onChange={(e) => setManualForm({ ...manualForm, recurringType: e.target.value as RecurringType })}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
+                        >
+                            <option value="none">Không lặp lại</option>
+                            <option value="daily">Hàng ngày</option>
+                            <option value="weekly">Hàng tuần</option>
+                            <option value="monthly">Hàng tháng</option>
+                            <option value="yearly">Hàng năm</option>
+                        </select>
+                   </div>
+                   
+                   {/* Description */}
+                   <div>
+                       <textarea
+                            rows={2}
+                            value={manualForm.description}
+                            onChange={(e) => setManualForm({ ...manualForm, description: e.target.value })}
+                            placeholder="Chi tiết / Ghi chú..."
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-orange-500 outline-none resize-none bg-white dark:bg-gray-700 dark:text-white"
+                        />
+                   </div>
+
+                    {/* Checklist (Simplified) */}
+                   <div>
+                       <textarea
+                            rows={2}
+                            value={manualForm.checklistText}
+                            onChange={(e) => setManualForm({ ...manualForm, checklistText: e.target.value })}
+                            placeholder="Checklist (mỗi dòng 1 việc)..."
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-orange-500 outline-none resize-none bg-white dark:bg-gray-700 dark:text-white border-dashed"
+                        />
+                   </div>
+
+                   <button 
+                    onClick={handleManualSubmit}
+                    className="w-full bg-orange-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-orange-700 transition flex items-center justify-center gap-2 shadow-sm active:scale-95"
+                   >
+                     <Plus size={14} /> Tạo công việc
+                   </button>
+                </div>
+              )}
            </div>
 
            {/* Button Bar */}
@@ -1079,7 +1372,7 @@ const App: React.FC = () => {
            </div>
            
            <div className="p-2 border-t border-orange-100 dark:border-gray-800 text-[10px] text-center text-gray-400 bg-orange-50 dark:bg-gray-800 flex-shrink-0">
-             v2.4.2 • SmartCal Pro • AI Powered
+             v2.4.3 • SmartCal Pro • AI Powered
            </div>
         </div>
 
