@@ -1,0 +1,7 @@
+{
+  "name": "smartcal",
+  "description": "Ứng dụng quản lý lịch và công việc tích hợp Gemini AI và Telegram, giao diện tiếng Việt.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

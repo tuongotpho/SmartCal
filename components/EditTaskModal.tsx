@@ -1,0 +1,409 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Task, RecurringType, Tag, Subtask } from '../types';
+import { X, Save, Calendar, Clock, FileText, Type, Repeat, CheckCircle2, Tag as TagIcon, ListChecks, Plus, Trash2, CheckSquare, Square, ArrowRight, Mic, MicOff, Sparkles, RefreshCw } from 'lucide-react';
+import { ToastType } from './Toast';
+import { parseTaskWithGemini } from '../services/geminiService';
+
+interface EditTaskModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  task: Task | null;
+  tags: Tag[];
+  onSave: (updatedTask: Task) => void;
+  showToast: (message: string, type: ToastType) => void;
+}
+
+const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, tags, onSave, showToast }) => {
+  const [formData, setFormData] = useState<Task | null>(null);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  
+  // Voice & AI State
+  const [isListening, setIsListening] = useState(false);
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const silenceTimerRef = useRef<any>(null); // Timer tự ngắt khi im lặng
+  const transcriptBufferRef = useRef<string>(""); // Bộ đệm chứa văn bản giọng nói
+
+  useEffect(() => {
+    if (task) {
+      setFormData({
+         ...task,
+         endDate: task.endDate || task.date,
+         recurringType: task.recurringType || (task.isRecurring ? 'daily' : 'none'),
+         tag: task.tag || 'Khác',
+         subtasks: task.subtasks || []
+      });
+    }
+  }, [task]);
+
+  // Voice Input Logic
+  const toggleVoiceInput = () => {
+    if (isListening) {
+      if (recognitionRef.current) recognitionRef.current.stop();
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      setIsListening(false);
+    } else {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        showToast("Trình duyệt không hỗ trợ nhận diện giọng nói.", "error");
+        return;
+      }
+      // Reset buffer
+      transcriptBufferRef.current = "";
+
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.lang = 'vi-VN';
+      // Continuous = true để giữ mic mở, ta tự quản lý việc ngắt bằng timer
+      recognitionRef.current.continuous = true; 
+      recognitionRef.current.interimResults = true;
+
+      recognitionRef.current.onstart = () => setIsListening(true);
+      recognitionRef.current.onend = async () => {
+         setIsListening(false);
+         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+         
+         const text = transcriptBufferRef.current.trim();
+         if (text) {
+             await processAIInput(text);
+         }
+      };
+      
+      recognitionRef.current.onresult = (event: any) => {
+        // Reset timer im lặng mỗi khi nhận được tín hiệu (interim hoặc final)
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = setTimeout(() => {
+             if (recognitionRef.current) recognitionRef.current.stop();
+        }, 1500); // 1.5 giây im lặng -> Tự ngắt
+
+        // Chỉ lấy các kết quả đã Final để tránh bị lặp hoặc rác
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+             if (event.results[i].isFinal) {
+                 transcriptBufferRef.current += event.results[i][0].transcript + " ";
+             }
+        }
+      };
+      
+      recognitionRef.current.onerror = (event: any) => {
+         console.error(event.error);
+         if (event.error !== 'no-speech') {
+             setIsListening(false);
+             if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+             showToast("Lỗi nhận diện giọng nói", "error");
+         }
+      };
+
+      recognitionRef.current.start();
+    }
+  };
+
+  const processAIInput = async (text: string) => {
+    if (!formData) return;
+    setIsProcessingAI(true);
+    try {
+        const availableTags = tags.map(t => t.name);
+        const result = await parseTaskWithGemini(text, availableTags);
+        
+        if (result) {
+            setFormData(prev => {
+                if (!prev) return null;
+                return {
+                    ...prev,
+                    title: result.title,
+                    date: result.date,
+                    endDate: result.endDate || result.date,
+                    time: result.time,
+                    description: (prev.description ? prev.description + "\n" : "") + (result.description || ""),
+                    recurringType: (result.recurringType as RecurringType) || 'none',
+                    tag: result.tag || 'Khác'
+                };
+            });
+            showToast("Đã điền thông tin từ giọng nói!", "success");
+        } else {
+            showToast("AI không trích xuất được thông tin.", "warning");
+            // Nếu AI fail, ít nhất điền text vào title
+            setFormData(prev => prev ? ({ ...prev, title: text }) : null);
+        }
+    } catch (e) {
+        showToast("Lỗi xử lý AI.", "error");
+    } finally {
+        setIsProcessingAI(false);
+    }
+  };
+
+  const handleAddSubtask = () => {
+    if (!newSubtaskTitle.trim() || !formData) return;
+    const newSubtask: Subtask = {
+      id: Date.now().toString(),
+      title: newSubtaskTitle.trim(),
+      completed: false
+    };
+    setFormData({
+      ...formData,
+      subtasks: [...(formData.subtasks || []), newSubtask]
+    });
+    setNewSubtaskTitle("");
+  };
+
+  const handleToggleSubtask = (subtaskId: string) => {
+    if (!formData || !formData.subtasks) return;
+    const updatedSubtasks = formData.subtasks.map(st => 
+      st.id === subtaskId ? { ...st, completed: !st.completed } : st
+    );
+    setFormData({ ...formData, subtasks: updatedSubtasks });
+  };
+
+  const handleDeleteSubtask = (subtaskId: string) => {
+    if (!formData || !formData.subtasks) return;
+    const updatedSubtasks = formData.subtasks.filter(st => st.id !== subtaskId);
+    setFormData({ ...formData, subtasks: updatedSubtasks });
+  };
+
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!formData) return;
+    const newDate = e.target.value;
+    let newEndDate = formData.endDate;
+    if (newEndDate && newEndDate < newDate) {
+      newEndDate = newDate;
+    }
+    setFormData({ ...formData, date: newDate, endDate: newEndDate });
+  }
+
+  if (!isOpen || !formData) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-orange-950/30 backdrop-blur-sm">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 border border-orange-100 flex flex-col max-h-[90vh]">
+        <div className="bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-4 flex justify-between items-center flex-shrink-0">
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            {formData.id === 'temp' ? 'Thêm công việc mới' : 'Chỉnh sửa công việc'}
+          </h2>
+          <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition"><X size={20} /></button>
+        </div>
+        
+        <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
+          {/* Title Input with Voice Button */}
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1 flex items-center gap-1 justify-between">
+              <span className="flex items-center gap-1"><Type size={14} /> Tiêu đề</span>
+              {isListening && <span className="text-red-500 animate-pulse flex items-center gap-1"><Mic size={12}/> Đang nghe...</span>}
+              {isProcessingAI && <span className="text-blue-500 animate-pulse flex items-center gap-1"><Sparkles size={12}/> Đang phân tích...</span>}
+            </label>
+            <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="VD: Họp team vào 9h sáng mai"
+                  style={{ colorScheme: 'light' }}
+                  className="flex-1 bg-white text-gray-900 border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                  autoFocus={formData.id === 'temp'}
+                />
+                <button 
+                    onClick={toggleVoiceInput}
+                    disabled={isProcessingAI}
+                    className={`p-2 rounded border transition-all shadow-sm flex-shrink-0
+                        ${isListening 
+                            ? 'bg-red-500 text-white border-red-600 animate-pulse ring-2 ring-red-200' 
+                            : 'bg-white text-gray-500 border-gray-300 hover:text-orange-600 hover:border-orange-300'
+                        }
+                        ${isProcessingAI ? 'opacity-50 cursor-not-allowed' : ''}
+                    `}
+                    title="Nhập bằng giọng nói (AI)"
+                >
+                    {isProcessingAI ? <RefreshCw size={18} className="animate-spin text-blue-500"/> : (isListening ? <MicOff size={18} /> : <Mic size={18} />)}
+                </button>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1 italic">
+                * Mẹo: Tự động ngắt sau 1.5s im lặng.
+            </p>
+          </div>
+
+          {/* Date Range Section */}
+          <div className="flex flex-col gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+             <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-gray-600 mb-1 flex items-center gap-1">
+                    <Calendar size={14} /> Bắt đầu
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.date}
+                    onChange={handleStartDateChange}
+                    style={{ colorScheme: 'light' }}
+                    className="w-full bg-white text-gray-900 border border-gray-300 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
+                  />
+                </div>
+                <div className="pt-5 text-gray-400">
+                   <ArrowRight size={16} />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-gray-600 mb-1 flex items-center gap-1">
+                    Kết thúc
+                  </label>
+                  <input
+                    type="date"
+                    min={formData.date}
+                    value={formData.endDate || formData.date}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    style={{ colorScheme: 'light' }}
+                    className="w-full bg-white text-gray-900 border border-gray-300 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
+                  />
+                </div>
+             </div>
+             
+             {/* Time Picker */}
+             <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1 flex items-center gap-1">
+                  <Clock size={14} /> Giờ (áp dụng cho ngày bắt đầu)
+                </label>
+                <input
+                  type="time"
+                  value={formData.time}
+                  onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                  style={{ colorScheme: 'light' }}
+                  className="w-full bg-white text-gray-900 border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                />
+             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+             {/* Recurring Select */}
+            <div className="flex flex-col gap-1">
+               <label className="text-xs font-bold text-gray-600 flex items-center gap-1">
+                  <Repeat size={14} /> Lặp lại
+               </label>
+               <select
+                  value={formData.recurringType || 'none'}
+                  onChange={(e) => setFormData({ ...formData, recurringType: e.target.value as RecurringType })}
+                  style={{ colorScheme: 'light' }}
+                  className="w-full bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold rounded px-2 py-2.5 focus:ring-2 focus:ring-rose-500 outline-none cursor-pointer"
+               >
+                  <option value="none">Không lặp lại</option>
+                  <option value="daily">Hàng ngày</option>
+                  <option value="weekly">Hàng tuần</option>
+                  <option value="monthly">Hàng tháng</option>
+                  <option value="yearly">Hàng năm</option>
+               </select>
+            </div>
+
+            {/* Tag Select */}
+            <div className="flex flex-col gap-1">
+               <label className="text-xs font-bold text-gray-600 flex items-center gap-1">
+                  <TagIcon size={14} /> Phân loại
+               </label>
+               <select
+                  value={formData.tag || 'Khác'}
+                  onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
+                  style={{ colorScheme: 'light' }}
+                  className="w-full bg-blue-50 border border-blue-200 text-blue-900 text-xs font-semibold rounded px-2 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+               >
+                  {tags.map(t => (
+                    <option key={t.name} value={t.name}>{t.name}</option>
+                  ))}
+               </select>
+            </div>
+          </div>
+
+          {/* Completed Toggle */}
+          <div className="flex flex-col gap-1">
+               <label className="text-xs font-bold text-gray-600 flex items-center gap-1">
+                  <CheckCircle2 size={14} /> Trạng thái
+               </label>
+               <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded border border-green-100 cursor-pointer hover:bg-green-100 transition" onClick={() => setFormData({ ...formData, completed: !formData.completed })}>
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${formData.completed ? 'bg-green-500 border-green-500' : 'bg-white border-gray-300'}`}>
+                    {formData.completed && <CheckCircle2 size={10} className="text-white" />}
+                  </div>
+                  <span className="text-xs font-bold text-green-900">{formData.completed ? "Đã hoàn thành" : "Đang thực hiện"}</span>
+               </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1 flex items-center gap-1">
+              <FileText size={14} /> Chi tiết / Ghi chú
+            </label>
+            <textarea
+              rows={2}
+              value={formData.description || ''}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              style={{ colorScheme: 'light' }}
+              className="w-full bg-white text-gray-900 border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none"
+            />
+          </div>
+
+          {/* Subtasks Section */}
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-2 flex items-center gap-1">
+              <ListChecks size={14} /> Công việc con (Checklist)
+            </label>
+            
+            <div className="flex gap-2 mb-2">
+              <input 
+                type="text" 
+                value={newSubtaskTitle}
+                onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                placeholder="Thêm bước nhỏ..."
+                style={{ colorScheme: 'light' }}
+                className="flex-1 bg-white border border-gray-300 rounded px-3 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
+                onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()}
+              />
+              <button onClick={handleAddSubtask} className="bg-orange-100 text-orange-600 p-1.5 rounded hover:bg-orange-200 transition">
+                <Plus size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-1.5 bg-gray-50 p-2 rounded border border-gray-200 min-h-[50px]">
+              {formData.subtasks && formData.subtasks.length > 0 ? (
+                formData.subtasks.map((st) => (
+                  <div key={st.id} className="flex items-center gap-2 bg-white p-2 rounded border border-gray-100 shadow-sm group">
+                    <button 
+                      onClick={() => handleToggleSubtask(st.id)}
+                      className={`text-gray-400 hover:text-green-600 transition ${st.completed ? 'text-green-500' : ''}`}
+                    >
+                      {st.completed ? <CheckSquare size={16} /> : <Square size={16} />}
+                    </button>
+                    <span className={`flex-1 text-xs ${st.completed ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                      {st.title}
+                    </span>
+                    <button 
+                      onClick={() => handleDeleteSubtask(st.id)}
+                      className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-[10px] text-gray-400 text-center py-2">Chưa có checklist</p>
+              )}
+            </div>
+          </div>
+
+        </div>
+
+        <div className="bg-gray-50 px-6 py-4 flex justify-end gap-2 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-200 text-sm font-medium transition"
+          >
+            Hủy
+          </button>
+          <button
+            onClick={() => {
+              if (!formData.title || !formData.date) {
+                showToast("Vui lòng nhập tiêu đề và ngày bắt đầu", "warning");
+                return;
+              }
+              onSave(formData);
+              onClose();
+            }}
+            className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition shadow-md text-sm font-medium"
+          >
+            <Save size={16} /> Lưu thay đổi
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default EditTaskModal;
