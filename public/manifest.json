@@ -14,9 +14,9 @@
       "sizes": "512x512"
     }
   ],
-  "id": "/",
-  "start_url": "/",
-  "scope": "/",
+  "id": "smartcal-pro",
+  "start_url": "./index.html",
+  "scope": ".",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#ea580c",

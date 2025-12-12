@@ -1,9 +1,10 @@
 
-const CACHE_NAME = 'smartcal-cache-v2';
+const CACHE_NAME = 'smartcal-cache-v3';
+// Sử dụng đường dẫn tương đối ./ để đảm bảo hoạt động đúng trong sub-folder hoặc môi trường preview
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json',
+  './',
+  './index.html',
+  './manifest.json',
   'https://cdn.tailwindcss.com',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
 ];
@@ -14,8 +15,6 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Opened cache');
-        // Sử dụng addAll với 'no-cors' nếu cần cho external resources, nhưng addAll mặc định sẽ fail nếu 1 request fail.
-        // Tốt nhất là handle từng cái hoặc chấp nhận rủi ro.
         return cache.addAll(urlsToCache);
       })
       .catch(err => console.log('Cache install error', err))
@@ -42,18 +41,17 @@ self.addEventListener('activate', event => {
 
 // Fetch Event
 self.addEventListener('fetch', event => {
-  // Bỏ qua các request không phải GET hoặc chrome-extension
   if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) {
       return;
   }
 
-  // Network First cho API (Firebase, Gemini)
+  // Network First for APIs
   if (event.request.url.includes('firebase') || event.request.url.includes('googleapis') || event.request.url.includes('ai.studio')) {
       event.respondWith(fetch(event.request));
       return;
   }
 
-  // Stale-While-Revalidate cho các tài nguyên khác
+  // Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request)
       .then(cachedResponse => {
@@ -68,7 +66,7 @@ self.addEventListener('fetch', event => {
              return networkResponse;
            }
         ).catch(() => {
-            // Nếu mất mạng và không có cache, có thể trả về trang offline fallback ở đây
+           // Silent catch
         });
         return cachedResponse || fetchPromise;
       })
