@@ -29,6 +29,9 @@ export interface Task {
   tag?: string; // Tên thẻ (VD: Công việc, Gia đình)
   color?: string; // Deprecated in favor of tag lookup
   subtasks?: Subtask[]; // Danh sách công việc con
+  
+  // New field for Kanban
+  customStatus?: 'todo' | 'in_progress' | 'done'; 
 }
 
 export interface TelegramConfig {
@@ -41,7 +44,8 @@ export enum ViewMode {
   WEEK = 'WEEK',
   DAY = 'DAY',
   LIST = 'LIST',
-  STATS = 'STATS'
+  STATS = 'STATS',
+  KANBAN = 'KANBAN' // New Mode
 }
 
 // Updated Palettes with Dark Mode support (dark:...)

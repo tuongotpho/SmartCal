@@ -8,7 +8,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Lịch Nhắc Việc Thông Minh</title>
-    <link rel="manifest" href="/manifest.json">
+    <!-- Update path to relative for safety in sub-paths -->
+    <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/thanhlv87/pic/refs/heads/main/august.png">
     
     <!-- Tailwind CSS CDN -->
@@ -113,5 +114,22 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
+    
+    <!-- PWA Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          // Sử dụng ./sw.js thay vì /sw.js để tránh lỗi origin mismatch trong các môi trường preview/iframe
+          navigator.serviceWorker.register('./sw.js')
+            .then(registration => {
+              console.log('SW registered with scope:', registration.scope);
+            })
+            .catch(registrationError => {
+              console.warn('SW registration failed:', registrationError);
+              // Lỗi này không ảnh hưởng đến chức năng chính của app, chỉ mất tính năng offline
+            });
+        });
+      }
+    </script>
   </body>
 </html>

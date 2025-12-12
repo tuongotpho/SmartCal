@@ -86,6 +86,45 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
   }
 };
 
+export const suggestSubtasks = async (taskTitle: string, taskDescription?: string): Promise<string[]> => {
+  try {
+    const ai = getAiClient();
+    if (!ai) throw new Error("Vui lòng cấu hình API Key.");
+
+    const prompt = `
+      Tôi có một công việc: "${taskTitle}"
+      Chi tiết: "${taskDescription || ''}"
+      
+      Hãy chia nhỏ công việc này thành 3 đến 7 bước cụ thể, ngắn gọn để tôi dễ thực hiện (Checklist).
+      Chỉ trả về danh sách các đầu mục, không cần đánh số hay thêm lời dẫn.
+      
+      Ví dụ input: "Làm bánh bông lan"
+      Output JSON: ["Chuẩn bị nguyên liệu (bột, trứng, sữa)", "Đánh trứng và trộn bột", "Làm nóng lò nướng", "Đổ khuôn và nướng bánh", "Kiểm tra và trang trí"]
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+           type: Type.ARRAY,
+           items: { type: Type.STRING }
+        }
+      }
+    });
+
+    if (response.text) {
+      const data = JSON.parse(response.text);
+      if (Array.isArray(data)) return data;
+    }
+    return [];
+  } catch (error) {
+    console.error("Lỗi tạo subtasks:", error);
+    return [];
+  }
+};
+
 export const generateReport = async (tasks: Task[], range: string): Promise<string> => {
   try {
     const ai = getAiClient();

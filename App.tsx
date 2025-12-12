@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   format, 
@@ -21,7 +22,8 @@ import {
   Square, 
   PieChart, 
   Layout,
-  X
+  X,
+  Kanban
 } from 'lucide-react';
 import CalendarView from './components/CalendarView';
 import StatsView from './components/StatsView';
@@ -35,6 +37,7 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MobileNavigation from './components/MobileNavigation';
 import DashboardView from './components/DashboardView';
+import KanbanView from './components/KanbanView';
 
 import { Task, TelegramConfig, ViewMode, Tag, DEFAULT_TASK_TAGS, RecurringType } from './types';
 import { parseTaskWithGemini, generateReport } from './services/geminiService';
@@ -306,6 +309,19 @@ const App: React.FC = () => {
     }
   }, [useFirebase, showToast, isOfflineMode]);
 
+  const handleUpdateStatusKanban = useCallback(async (taskId: string, status: 'todo' | 'in_progress' | 'done') => {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      const updatedTask: Task = {
+          ...task,
+          completed: status === 'done', // Map done to completed
+          customStatus: status
+      };
+      
+      await handleUpdateTask(updatedTask, false);
+  }, [tasks, handleUpdateTask]);
+
   const handleSaveTags = useCallback(async (newTags: Tag[]) => {
     setTags(newTags); // Optimistic UI update
     
@@ -440,7 +456,8 @@ const App: React.FC = () => {
           recurringType: newTask.recurringType || 'none',
           tag: newTask.tag || 'Khác',
           subtasks: newTask.subtasks || [],
-          isRecurring: false
+          isRecurring: false,
+          customStatus: 'todo' // Default for new tasks
         });
         if (syncTelegram) showToast("Đã thêm công việc mới", "success");
       } catch (e) {
@@ -519,7 +536,8 @@ const App: React.FC = () => {
       reminderSent: false,
       recurringType: 'none',
       tag: 'Khác',
-      subtasks: []
+      subtasks: [],
+      customStatus: 'todo'
     };
     setEditingTask(newTask);
     setIsEditModalOpen(true);
@@ -560,7 +578,8 @@ const App: React.FC = () => {
               reminderSent: false,
               recurringType: (result.recurringType as RecurringType) || 'none',
               tag: result.tag || 'Khác',
-              subtasks: []
+              subtasks: [],
+              customStatus: 'todo'
             }, false);
             count++;
           }
@@ -636,6 +655,18 @@ const App: React.FC = () => {
             onDeleteTask={handleDeleteTask}
           />
         );
+    }
+
+    if (viewMode === ViewMode.KANBAN) {
+       return (
+          <KanbanView 
+             tasks={filteredTasks}
+             tags={tags}
+             onToggleComplete={handleToggleComplete}
+             onOpenEditModal={openEditModal}
+             onUpdateStatus={handleUpdateStatusKanban}
+          />
+       )
     }
 
     return (
@@ -746,6 +777,12 @@ const App: React.FC = () => {
                   className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all ${viewMode === ViewMode.LIST ? 'bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 shadow-sm' : 'text-orange-900/60 dark:text-gray-200 hover:text-orange-900 dark:hover:text-white'}`}
                 >
                    <Layout size={14} /> Dashboard
+                </button>
+                <button 
+                  onClick={() => setViewMode(ViewMode.KANBAN)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all ${viewMode === ViewMode.KANBAN ? 'bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 shadow-sm' : 'text-orange-900/60 dark:text-gray-200 hover:text-orange-900 dark:hover:text-white'}`}
+                >
+                   <Kanban size={14} /> Kanban
                 </button>
                 <button 
                   onClick={() => setViewMode(ViewMode.STATS)}

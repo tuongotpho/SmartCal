@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Task, RecurringType, Tag, Subtask } from '../types';
-import { X, Save, Calendar, Clock, FileText, Type, Repeat, CheckCircle2, Tag as TagIcon, ListChecks, Plus, Trash2, CheckSquare, Square, ArrowRight, Mic, MicOff, Sparkles, RefreshCw } from 'lucide-react';
+import { X, Save, Calendar, Clock, FileText, Type, Repeat, CheckCircle2, Tag as TagIcon, ListChecks, Plus, Trash2, CheckSquare, Square, ArrowRight, Mic, MicOff, Sparkles, RefreshCw, Wand2 } from 'lucide-react';
 import { ToastType } from './Toast';
-import { parseTaskWithGemini } from '../services/geminiService';
+import { parseTaskWithGemini, suggestSubtasks } from '../services/geminiService';
 
 interface EditTaskModalProps {
   isOpen: boolean;
@@ -21,6 +21,8 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
   // Voice & AI State
   const [isListening, setIsListening] = useState(false);
   const [isProcessingAI, setIsProcessingAI] = useState(false);
+  const [isGeneratingSubtasks, setIsGeneratingSubtasks] = useState(false);
+  
   const recognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<any>(null); // Timer tự ngắt khi im lặng
   const transcriptBufferRef = useRef<string>(""); // Bộ đệm chứa văn bản giọng nói
@@ -128,6 +130,39 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
         showToast("Lỗi xử lý AI.", "error");
     } finally {
         setIsProcessingAI(false);
+    }
+  };
+
+  const handleSmartBreakdown = async () => {
+    if (!formData?.title) {
+      showToast("Vui lòng nhập tiêu đề trước khi dùng AI.", "warning");
+      return;
+    }
+    setIsGeneratingSubtasks(true);
+    try {
+      const suggestions = await suggestSubtasks(formData.title, formData.description);
+      if (suggestions.length > 0) {
+        const newSubtasks: Subtask[] = suggestions.map(title => ({
+          id: Date.now().toString() + Math.random().toString(),
+          title: title,
+          completed: false
+        }));
+        
+        setFormData(prev => {
+          if (!prev) return null;
+          return {
+             ...prev,
+             subtasks: [...(prev.subtasks || []), ...newSubtasks]
+          };
+        });
+        showToast(`Đã thêm ${suggestions.length} bước nhỏ.`, "success");
+      } else {
+        showToast("AI không nghĩ ra bước nào cả :(", "info");
+      }
+    } catch (e) {
+      showToast("Lỗi kết nối AI.", "error");
+    } finally {
+      setIsGeneratingSubtasks(false);
     }
   };
 
@@ -326,9 +361,20 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
 
           {/* Subtasks Section */}
           <div>
-            <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-2 flex items-center gap-1">
-              <ListChecks size={14} /> Công việc con (Checklist)
-            </label>
+            <div className="flex justify-between items-end mb-2">
+                <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                  <ListChecks size={14} /> Công việc con (Checklist)
+                </label>
+                <button 
+                  onClick={handleSmartBreakdown}
+                  disabled={isGeneratingSubtasks}
+                  className="text-[10px] bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-full flex items-center gap-1 hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition shadow-sm"
+                  title="Dùng AI để chia nhỏ công việc"
+                >
+                  {isGeneratingSubtasks ? <RefreshCw size={10} className="animate-spin"/> : <Wand2 size={10} />} 
+                  {isGeneratingSubtasks ? "Đang tạo..." : "AI Chia nhỏ"}
+                </button>
+            </div>
             
             <div className="flex gap-2 mb-2">
               <input 
