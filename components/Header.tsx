@@ -10,8 +10,7 @@ import {
   Moon, 
   Settings, 
   LogOut, 
-  User, 
-  Download 
+  User
 } from 'lucide-react';
 import { format } from 'date-fns';
 import DatePickerPopover from './DatePickerPopover';
@@ -37,7 +36,6 @@ interface HeaderProps {
   onLogout: () => void;
   datePickerRef: React.RefObject<HTMLDivElement>;
   searchInputRef: React.RefObject<HTMLInputElement>;
-  installPWA?: (() => void) | null;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -59,8 +57,7 @@ const Header: React.FC<HeaderProps> = ({
   setIsSettingsOpen,
   onLogout,
   datePickerRef,
-  searchInputRef,
-  installPWA
+  searchInputRef
 }) => {
   return (
     // FIX: Sử dụng px-3 pb-3 thay vì p-3 để không ghi đè padding-top
@@ -143,17 +140,6 @@ const Header: React.FC<HeaderProps> = ({
                 {user?.displayName || (isOfflineMode ? 'Offline' : 'User')}
               </span>
            </div>
-
-          {/* Install App Button (Visible if PWA install prompt is available) */}
-          {installPWA && (
-            <button 
-              onClick={installPWA} 
-              className="hidden md:flex bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-full transition text-xs font-bold items-center gap-1 backdrop-blur-sm active:scale-95 animate-pulse"
-              title="Cài đặt ứng dụng"
-            >
-              <Download size={14} /> <span>Cài App</span>
-            </button>
-          )}
 
           {/* Dark Mode Toggle */}
            <button 

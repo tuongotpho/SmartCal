@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { TelegramConfig, Tag, COLOR_PALETTES } from '../types';
-import { X, Save, Key, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Sparkles, Download, Smartphone } from 'lucide-react';
+import { X, Save, Key, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Sparkles } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 import { ToastType } from './Toast';
 
@@ -16,7 +16,6 @@ interface SettingsModalProps {
   isSyncing: boolean;
   lastSyncTime: string;
   showToast: (message: string, type: ToastType) => void;
-  installPWA: (() => void) | null;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
@@ -29,8 +28,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onManualSync,
   isSyncing,
   lastSyncTime,
-  showToast,
-  installPWA
+  showToast
 }) => {
   const [config, setConfig] = useState<TelegramConfig>(telegramConfig);
   const [currentTags, setCurrentTags] = useState<Tag[]>(tags);
@@ -134,24 +132,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
           {activeTab === 'general' ? (
             <div className="space-y-6">
-              {/* Install PWA Button - Only show if available */}
-              {installPWA && (
-                <div className="bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-900/20 dark:to-blue-900/20 p-4 rounded-lg border border-indigo-100 dark:border-indigo-800">
-                   <h3 className="text-indigo-800 dark:text-indigo-300 font-bold text-sm mb-2 flex items-center gap-2">
-                      <Smartphone size={16} /> Cài đặt ứng dụng
-                   </h3>
-                   <p className="text-xs text-indigo-600 dark:text-indigo-400 mb-3">
-                      Cài đặt SmartCal vào màn hình chính để sử dụng như ứng dụng Native (Full màn hình, không thanh địa chỉ).
-                   </p>
-                   <button 
-                     onClick={installPWA}
-                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 rounded-lg transition shadow-sm flex items-center justify-center gap-2"
-                   >
-                     <Download size={16} /> Cài đặt ngay
-                   </button>
-                </div>
-              )}
-
               {/* Gemini Config */}
               <div className="space-y-3">
                  <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">

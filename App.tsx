@@ -779,7 +779,6 @@ const App: React.FC = () => {
         onLogout={() => { if(isOfflineMode) window.location.reload(); else logOut(); }}
         datePickerRef={datePickerRef}
         searchInputRef={searchInputRef}
-        installPWA={deferredPrompt ? handleInstallPWA : null}
       />
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
@@ -899,10 +898,9 @@ const App: React.FC = () => {
         onSaveConfig={setTelegramConfig}
         onSaveTags={handleSaveTags}
         onManualSync={handleSyncFromTelegram}
-        isSyncing={false} // Removed direct processing state from App as it's less critical for sync button feedback now
+        isSyncing={false}
         lastSyncTime={format(new Date(), 'HH:mm')}
         showToast={showToast}
-        installPWA={deferredPrompt ? handleInstallPWA : null}
       />
       <EditTaskModal 
         isOpen={isEditModalOpen} 
