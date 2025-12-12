@@ -11,7 +11,7 @@ import {
   Settings, 
   LogOut, 
   User, 
-  Flame 
+  Download 
 } from 'lucide-react';
 import { format } from 'date-fns';
 import DatePickerPopover from './DatePickerPopover';
@@ -37,6 +37,7 @@ interface HeaderProps {
   onLogout: () => void;
   datePickerRef: React.RefObject<HTMLDivElement>;
   searchInputRef: React.RefObject<HTMLInputElement>;
+  installPWA?: (() => void) | null;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -58,14 +59,19 @@ const Header: React.FC<HeaderProps> = ({
   setIsSettingsOpen,
   onLogout,
   datePickerRef,
-  searchInputRef
+  searchInputRef,
+  installPWA
 }) => {
   return (
     <div className="bg-gradient-to-r from-orange-500/95 to-red-600/95 backdrop-blur-md text-white p-3 shadow-md z-30 flex-shrink-0 sticky top-0">
       <div className="flex justify-between items-center px-1 lg:px-4">
         <div className="flex items-center gap-2">
-          <div className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm shadow-inner hidden sm:block">
-            <Flame size={20} className="text-yellow-200" fill="currentColor" />
+          <div className="hidden sm:block">
+            <img 
+               src="https://raw.githubusercontent.com/thanhlv87/pic/refs/heads/main/august.png" 
+               alt="SmartCal Logo" 
+               className="w-9 h-9 object-contain drop-shadow-sm"
+            />
           </div>
           <h1 className="text-lg font-bold tracking-tight">SmartCal <span className="hidden sm:inline-block text-xs font-light opacity-80 bg-white/10 px-1 rounded">PRO</span></h1>
         </div>
@@ -135,6 +141,17 @@ const Header: React.FC<HeaderProps> = ({
                 {user?.displayName || (isOfflineMode ? 'Offline' : 'User')}
               </span>
            </div>
+
+          {/* Install App Button (Visible if PWA install prompt is available) */}
+          {installPWA && (
+            <button 
+              onClick={installPWA} 
+              className="hidden md:flex bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-full transition text-xs font-bold items-center gap-1 backdrop-blur-sm active:scale-95 animate-pulse"
+              title="Cài đặt ứng dụng"
+            >
+              <Download size={14} /> <span>Cài App</span>
+            </button>
+          )}
 
           {/* Dark Mode Toggle */}
            <button 

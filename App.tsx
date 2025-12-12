@@ -779,6 +779,7 @@ const App: React.FC = () => {
         onLogout={() => { if(isOfflineMode) window.location.reload(); else logOut(); }}
         datePickerRef={datePickerRef}
         searchInputRef={searchInputRef}
+        installPWA={deferredPrompt ? handleInstallPWA : null}
       />
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">

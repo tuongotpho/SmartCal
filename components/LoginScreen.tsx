@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Flame, CheckCircle2, WifiOff, AlertTriangle, Mail, Lock, X, LogIn } from 'lucide-react';
+import { CheckCircle2, WifiOff, AlertTriangle, Mail, Lock, X, LogIn } from 'lucide-react';
 import { signInWithGoogle, signInWithEmail } from '../services/firebase';
 
 interface LoginScreenProps {
@@ -53,8 +53,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
       <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-orange-100 dark:border-gray-800 p-8 text-center animate-in fade-in zoom-in duration-500 relative">
         
         {/* Logo Animation */}
-        <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-red-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-6 transform hover:rotate-6 transition-transform duration-300">
-           <Flame size={48} className="text-white" fill="currentColor" />
+        <div className="w-24 h-24 bg-white dark:bg-gray-800 rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-6 transform hover:rotate-6 transition-transform duration-300 overflow-hidden p-2 border border-orange-100 dark:border-gray-700">
+           <img 
+              src="https://raw.githubusercontent.com/thanhlv87/pic/refs/heads/main/august.png" 
+              alt="SmartCal Logo" 
+              className="w-full h-full object-contain"
+           />
         </div>
 
         <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-2">
