@@ -55,7 +55,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
         {/* Logo Animation */}
         <div className="w-24 h-24 bg-white dark:bg-gray-800 rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-6 transform hover:rotate-6 transition-transform duration-300 overflow-hidden p-2 border border-orange-100 dark:border-gray-700">
            <img 
-              src="https://raw.githubusercontent.com/thanhlv87/pic/refs/heads/main/august.png" 
+              src="https://raw.githubusercontent.com/thanhlv87/pic/refs/heads/main/august2.png" 
               alt="SmartCal Logo" 
               className="w-full h-full object-contain"
            />
