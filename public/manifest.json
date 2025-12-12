@@ -15,8 +15,8 @@
     }
   ],
   "id": "smartcal-pro",
-  "start_url": "./index.html",
-  "scope": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#ea580c",

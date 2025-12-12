@@ -1,10 +1,10 @@
 
-const CACHE_NAME = 'smartcal-cache-v4';
-// Sử dụng đường dẫn tương đối ./ để đảm bảo hoạt động đúng trong sub-folder hoặc môi trường preview
+const CACHE_NAME = 'smartcal-cache-v5';
+// Sử dụng đường dẫn tuyệt đối / để đảm bảo cache đúng file gốc
 const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.json',
+  '/',
+  '/index.html',
+  '/manifest.json',
   'https://cdn.tailwindcss.com',
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
 ];
