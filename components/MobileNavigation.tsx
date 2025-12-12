@@ -23,8 +23,9 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
   onOpenSettings
 }) => {
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-orange-100 dark:border-gray-800 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40 pb-safe h-[64px]">
-      <div className="grid grid-cols-5 h-full items-center max-w-md mx-auto">
+    // FIX: Sử dụng env(safe-area-inset-bottom, 20px) làm fallback để đảm bảo menu không sát đáy trên các máy vuốt cử chỉ
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-orange-100 dark:border-gray-800 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40 pb-[env(safe-area-inset-bottom,20px)] h-auto min-h-[64px]">
+      <div className="grid grid-cols-5 h-[64px] items-center max-w-md mx-auto">
         {/* 1. Dashboard */}
         <button onClick={() => setViewMode(ViewMode.LIST)} className={`flex flex-col items-center justify-center gap-0.5 h-full active:scale-95 transition-all ${viewMode === ViewMode.LIST ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>
           <Layout size={22} strokeWidth={viewMode === ViewMode.LIST ? 2.5 : 2} />

@@ -63,7 +63,9 @@ const Header: React.FC<HeaderProps> = ({
   installPWA
 }) => {
   return (
-    <div className="bg-gradient-to-r from-orange-500/95 to-red-600/95 backdrop-blur-md text-white p-3 shadow-md z-30 flex-shrink-0 sticky top-0">
+    // FIX: Sử dụng px-3 pb-3 thay vì p-3 để không ghi đè padding-top
+    // pt-[calc(0.75rem+env(safe-area-inset-top,0px))] đảm bảo cách lề trên ít nhất 12px + chiều cao tai thỏ
+    <div className="bg-gradient-to-r from-orange-500/95 to-red-600/95 backdrop-blur-md text-white px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] shadow-md z-30 flex-shrink-0 sticky top-0 transition-all">
       <div className="flex justify-between items-center px-1 lg:px-4">
         <div className="flex items-center gap-2">
           <div className="hidden sm:block">

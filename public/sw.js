@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'smartcal-cache-v3';
+const CACHE_NAME = 'smartcal-cache-v4';
 // Sử dụng đường dẫn tương đối ./ để đảm bảo hoạt động đúng trong sub-folder hoặc môi trường preview
 const urlsToCache = [
   './',
