@@ -70,7 +70,7 @@ const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-2">
           <div className="hidden sm:block">
             <img 
-               src="https://raw.githubusercontent.com/thanhlv87/pic/refs/heads/main/august.png" 
+               src="https://raw.githubusercontent.com/thanhlv87/pic/refs/heads/main/august2.png" 
                alt="SmartCal Logo" 
                className="w-9 h-9 object-contain drop-shadow-sm"
             />
