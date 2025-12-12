@@ -35,8 +35,8 @@ interface HeaderProps {
   toggleTheme: () => void;
   setIsSettingsOpen: (open: boolean) => void;
   onLogout: () => void;
-  datePickerRef: React.RefObject<HTMLDivElement | null>;
-  searchInputRef: React.RefObject<HTMLInputElement | null>;
+  datePickerRef: React.RefObject<HTMLDivElement>;
+  searchInputRef: React.RefObject<HTMLInputElement>;
 }
 
 const Header: React.FC<HeaderProps> = ({
