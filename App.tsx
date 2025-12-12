@@ -49,7 +49,8 @@ import {
   User,
   PenLine,
   History,
-  Timer
+  Timer,
+  Search
 } from 'lucide-react';
 import CalendarView from './components/CalendarView';
 import StatsView from './components/StatsView';
@@ -58,6 +59,7 @@ import EditTaskModal from './components/EditTaskModal';
 import ConfirmModal from './components/ConfirmModal';
 import DatePickerPopover from './components/DatePickerPopover';
 import LoginScreen from './components/LoginScreen';
+import AiAssistant from './components/AiAssistant';
 import Toast, { ToastMessage, ToastType } from './components/Toast';
 import { Task, TelegramConfig, ViewMode, RecurringType, Tag, DEFAULT_TASK_TAGS, Subtask } from './types';
 import { parseTaskWithGemini, generateReport } from './services/geminiService';
@@ -82,8 +84,11 @@ const App: React.FC = () => {
   // Tags Management State
   const [tags, setTags] = useState<Tag[]>(DEFAULT_TASK_TAGS);
   
-  // Filter State
+  // Filter & Search State
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Dashboard Mobile Tab State
   const [mobileListTab, setMobileListTab] = useState<'past' | 'today' | 'upcoming'>('today');
@@ -175,6 +180,13 @@ const App: React.FC = () => {
 
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
+  // Auto focus search
+  useEffect(() => {
+    if (isSearchActive && searchInputRef.current) {
+        searchInputRef.current.focus();
+    }
+  }, [isSearchActive]);
+
   // --- Filter Logic ---
   
   // Tính toán danh sách các thẻ ĐANG ĐƯỢC SỬ DỤNG
@@ -185,9 +197,24 @@ const App: React.FC = () => {
   }, [tasks, tags]);
 
   const filteredTasks = useMemo(() => {
-    if (!selectedTagFilter) return tasks;
-    return tasks.filter(t => (t.tag || 'Khác') === selectedTagFilter);
-  }, [tasks, selectedTagFilter]);
+    let result = tasks;
+
+    // Filter by Tag
+    if (selectedTagFilter) {
+      result = result.filter(t => (t.tag || 'Khác') === selectedTagFilter);
+    }
+
+    // Filter by Search Query
+    if (searchQuery.trim()) {
+      const lowerQuery = searchQuery.toLowerCase();
+      result = result.filter(t => 
+        t.title.toLowerCase().includes(lowerQuery) || 
+        t.description?.toLowerCase().includes(lowerQuery)
+      );
+    }
+
+    return result;
+  }, [tasks, selectedTagFilter, searchQuery]);
 
   // --- Toast Helper ---
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
@@ -1171,7 +1198,7 @@ const App: React.FC = () => {
       <div className="bg-gradient-to-r from-orange-500/95 to-red-600/95 backdrop-blur-md text-white p-3 shadow-md z-30 flex-shrink-0 sticky top-0">
         <div className="flex justify-between items-center px-1 lg:px-4">
           <div className="flex items-center gap-2">
-            <div className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm shadow-inner">
+            <div className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm shadow-inner hidden sm:block">
               <Flame size={20} className="text-yellow-200" fill="currentColor" />
             </div>
             <h1 className="text-lg font-bold tracking-tight">SmartCal <span className="hidden sm:inline-block text-xs font-light opacity-80 bg-white/10 px-1 rounded">PRO</span></h1>
@@ -1180,25 +1207,51 @@ const App: React.FC = () => {
           <div className="flex items-center gap-1 sm:gap-2 text-sm font-medium">
              <button onClick={handlePrev} className="hover:bg-white/20 p-1.5 rounded-full transition active:scale-90"><ChevronLeft size={20} /></button>
              
-             {/* Date Picker Trigger */}
-             <div className="relative" ref={datePickerRef}>
-               <button 
-                 onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                 className="min-w-[100px] sm:min-w-[140px] flex items-center justify-center gap-1 text-sm sm:text-base font-bold bg-white/10 px-2 py-1 rounded-md border border-white/20 shadow-sm backdrop-blur-sm hover:bg-white/20 transition active:scale-95 cursor-pointer"
-               >
-                 {getHeaderText} <ChevronDown size={14} className="opacity-70" />
-               </button>
-               
-               {isDatePickerOpen && (
-                 <DatePickerPopover 
-                   currentDate={currentDate}
-                   onDateSelect={(date) => {
-                     setCurrentDate(date);
-                     setIsDatePickerOpen(false);
-                   }}
-                   onClose={() => setIsDatePickerOpen(false)}
-                 />
-               )}
+             {/* Date Picker & Search Trigger */}
+             <div className="flex items-center gap-1">
+               {/* Search Input */}
+                <div className={`transition-all duration-300 overflow-hidden flex items-center ${isSearchActive ? 'w-32 sm:w-48 bg-white/20 rounded-md' : 'w-0'}`}>
+                    <input 
+                      ref={searchInputRef}
+                      type="text" 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onBlur={() => !searchQuery && setIsSearchActive(false)}
+                      placeholder="Tìm kiếm..."
+                      className="w-full bg-transparent border-none outline-none text-white text-xs px-2 py-1 placeholder-white/50"
+                    />
+                    {searchQuery && (
+                        <button onClick={() => setSearchQuery("")} className="p-1 hover:text-red-200"><X size={12}/></button>
+                    )}
+                </div>
+
+                {!isSearchActive && (
+                    <button onClick={() => setIsSearchActive(true)} className="p-1.5 hover:bg-white/20 rounded-full transition active:scale-95">
+                        <Search size={18} />
+                    </button>
+                )}
+
+               <div className="relative" ref={datePickerRef}>
+                  <button 
+                    onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+                    className="min-w-[80px] sm:min-w-[140px] flex items-center justify-center gap-1 text-sm sm:text-base font-bold bg-white/10 px-2 py-1 rounded-md border border-white/20 shadow-sm backdrop-blur-sm hover:bg-white/20 transition active:scale-95 cursor-pointer"
+                  >
+                    <span className="hidden sm:inline">{getHeaderText}</span>
+                    <span className="sm:hidden">{format(currentDate, 'dd/MM')}</span>
+                     <ChevronDown size={14} className="opacity-70" />
+                  </button>
+                  
+                  {isDatePickerOpen && (
+                    <DatePickerPopover 
+                      currentDate={currentDate}
+                      onDateSelect={(date) => {
+                        setCurrentDate(date);
+                        setIsDatePickerOpen(false);
+                      }}
+                      onClose={() => setIsDatePickerOpen(false)}
+                    />
+                  )}
+                </div>
              </div>
 
              <button onClick={handleNext} className="hover:bg-white/20 p-1.5 rounded-full transition active:scale-90"><ChevronRight size={20} /></button>
@@ -1311,6 +1364,16 @@ const App: React.FC = () => {
                     )
                   })}
                </div>
+             )}
+          </div>
+          
+          {/* Mobile Filter / Search Status */}
+          <div className="lg:hidden px-1 mb-1">
+             {searchQuery && (
+                 <div className="flex items-center justify-between bg-orange-100 dark:bg-gray-800 px-3 py-1.5 rounded-md text-xs">
+                    <span className="text-orange-800 dark:text-orange-200">Tìm: <b>{searchQuery}</b></span>
+                    <button onClick={() => setSearchQuery("")} className="text-orange-600 dark:text-orange-400"><X size={14}/></button>
+                 </div>
              )}
           </div>
 
@@ -1510,7 +1573,7 @@ const App: React.FC = () => {
            </div>
            
            <div className="p-2 border-t border-orange-100 dark:border-gray-800 text-[10px] text-center text-gray-400 bg-orange-50 dark:bg-gray-800 flex-shrink-0">
-             v2.4.3 • SmartCal Pro • AI Powered
+             v2.5.0 • SmartCal Pro • AI Powered
            </div>
         </div>
 
@@ -1553,6 +1616,8 @@ const App: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <AiAssistant tasks={tasks} />
 
       <SettingsModal 
         isOpen={isSettingsOpen} 

@@ -131,3 +131,62 @@ export const generateReport = async (tasks: Task[], range: string): Promise<stri
     return "<p>Đã xảy ra lỗi khi kết nối với Trợ lý AI.</p>";
   }
 };
+
+export const chatWithCalendar = async (question: string, tasks: Task[]): Promise<string> => {
+  try {
+    const ai = getAiClient();
+    if (!ai) return "Vui lòng cấu hình API Key để sử dụng tính năng này.";
+
+    const today = new Date().toISOString().split('T')[0];
+    const simpleTasks = tasks.map(t => ({
+       title: t.title,
+       date: t.date,
+       time: t.time,
+       status: t.completed ? "Đã hoàn thành" : "Chưa làm",
+       tag: t.tag,
+       description: t.description
+    }));
+
+    const prompt = `
+      Hôm nay là: ${today}.
+      Bạn là Thư ký riêng chuyên nghiệp của người dùng.
+      
+      Người dùng hỏi: "${question}"
+      
+      Dữ liệu lịch trình của người dùng:
+      ${JSON.stringify(simpleTasks)}
+
+      **Yêu cầu:**
+      1. Trả lời bằng định dạng **HTML** (không dùng Markdown block \`\`\`html).
+      2. Nếu câu hỏi liên quan đến lịch trình/công việc, hãy trình bày dạng báo cáo chuyên nghiệp.
+      3. Nếu là câu chào xã giao, trả lời ngắn gọn thân thiện.
+
+      **Quy tắc định dạng HTML cho lịch trình:**
+      - Sử dụng thẻ <b> để in đậm các thông tin quan trọng (Ngày, Tổng kết).
+      - Sử dụng thẻ <ul style="margin-top: 5px; padding-left: 15px; list-style-type: disc;"> và <li> để liệt kê công việc.
+      - Mỗi công việc hiển thị theo format: 
+        <li><b>Giờ</b>: Tên công việc - <i style="color: #666;">[Trạng thái]</i></li>
+      - Dùng biểu tượng cảm xúc phù hợp: ✅ (Đã xong), ⏳ (Chưa làm), 📅 (Lịch), 🚨 (Gấp).
+      - Xuống dòng dùng <br/>.
+
+      Ví dụ output mong muốn:
+      "Dưới đây là lịch trình ngày mai của bạn:<br/>
+      <b>📅 Ngày 2024-05-20:</b>
+      <ul style="padding-left: 20px;">
+         <li><b>08:00</b>: Họp team marketing - <i>✅ Đã xong</i></li>
+         <li><b>14:00</b>: Gặp khách hàng - <i>⏳ Chưa làm</i></li>
+      </ul>
+      <br/>Bạn nhớ chuẩn bị tài liệu nhé!"
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+
+    return response.text || "Xin lỗi, tôi không hiểu câu hỏi.";
+  } catch (error) {
+    console.error("Chat error:", error);
+    return "Đã xảy ra lỗi khi kết nối AI.";
+  }
+};
