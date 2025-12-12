@@ -14,8 +14,12 @@
       "sizes": "512x512"
     }
   ],
-  "start_url": ".",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "theme_color": "#ea580c",
-  "background_color": "#fff7ed"
+  "background_color": "#fff7ed",
+  "description": "Ứng dụng quản lý lịch và công việc tích hợp AI"
 }

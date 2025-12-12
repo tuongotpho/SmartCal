@@ -91,6 +91,9 @@ const App: React.FC = () => {
   // Toast State
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
+  // PWA Install Prompt State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
   // Telegram State
   const [telegramConfig, setTelegramConfig] = useState<TelegramConfig>(() => {
     try {
@@ -105,6 +108,37 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('lastTelegramUpdateId');
     return saved ? parseInt(saved, 10) : 0;
   });
+
+  // Capture PWA Install Prompt
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e);
+      console.log("PWA install prompt captured");
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallPWA = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult: any) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted the install prompt');
+        } else {
+          console.log('User dismissed the install prompt');
+        }
+        setDeferredPrompt(null);
+      });
+    }
+  };
 
   // Auth Listener
   useEffect(() => {
@@ -867,6 +901,7 @@ const App: React.FC = () => {
         isSyncing={false} // Removed direct processing state from App as it's less critical for sync button feedback now
         lastSyncTime={format(new Date(), 'HH:mm')}
         showToast={showToast}
+        installPWA={deferredPrompt ? handleInstallPWA : null}
       />
       <EditTaskModal 
         isOpen={isEditModalOpen} 
