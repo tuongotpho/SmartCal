@@ -2,23 +2,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Task } from "../types";
 
-// Hàm khởi tạo AI
-const getAiClient = () => {
-  // Chỉ lấy từ LocalStorage (Người dùng tự nhập trên giao diện)
-  const apiKey = localStorage.getItem('gemini_api_key');
-  
-  if (!apiKey) {
-    // Trả về null để UI xử lý hiển thị thông báo yêu cầu nhập key
-    return null;
-  }
-  return new GoogleGenAI({ apiKey });
-};
+// Initialize AI Client once using the environment variable
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+// Fix: Updated model to gemini-3-flash-preview and used response.text property as per guidelines
 export const parseTaskWithGemini = async (input: string, availableTags: string[]): Promise<{ title: string; date: string; endDate: string; time: string; duration: string; description: string; recurringType: string; tags: string[] } | null> => {
   try {
-    const ai = getAiClient();
-    if (!ai) throw new Error("Vui lòng nhập API Key Gemini trong phần Cài đặt.");
-
     const today = new Date().toISOString().split('T')[0];
     const dayOfWeek = new Date().getDay(); // 0-6
     
@@ -52,7 +41,7 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -74,7 +63,7 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
     });
 
     if (response.text) {
-      const data = JSON.parse(response.text);
+      const data = JSON.parse(response.text.trim());
       if (!data.endDate) data.endDate = data.date;
       if (!data.tags || data.tags.length === 0) data.tags = ['Khác'];
       return data;
@@ -82,16 +71,13 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
     return null;
   } catch (error) {
     console.error("Lỗi khi gọi Gemini:", error);
-    // Ném lỗi ra để UI catch và hiển thị Toast
     throw error;
   }
 };
 
+// Fix: Updated model to gemini-3-flash-preview
 export const suggestSubtasks = async (taskTitle: string, taskDescription?: string): Promise<string[]> => {
   try {
-    const ai = getAiClient();
-    if (!ai) throw new Error("Vui lòng cấu hình API Key.");
-
     const prompt = `
       Tôi có một công việc: "${taskTitle}"
       Chi tiết: "${taskDescription || ''}"
@@ -104,7 +90,7 @@ export const suggestSubtasks = async (taskTitle: string, taskDescription?: strin
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -116,7 +102,7 @@ export const suggestSubtasks = async (taskTitle: string, taskDescription?: strin
     });
 
     if (response.text) {
-      const data = JSON.parse(response.text);
+      const data = JSON.parse(response.text.trim());
       if (Array.isArray(data)) return data;
     }
     return [];
@@ -126,11 +112,9 @@ export const suggestSubtasks = async (taskTitle: string, taskDescription?: strin
   }
 };
 
+// Fix: Updated model to gemini-3-flash-preview
 export const generateReport = async (tasks: Task[], range: string): Promise<string> => {
   try {
-    const ai = getAiClient();
-    if (!ai) return "<p style='color:red'>Chưa cấu hình API Key. Vui lòng vào Cài đặt để nhập key.</p>";
-
     const tasksData = tasks.map(t => ({
       title: t.title,
       date: t.date,
@@ -161,7 +145,7 @@ export const generateReport = async (tasks: Task[], range: string): Promise<stri
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: prompt,
     });
 
@@ -172,11 +156,9 @@ export const generateReport = async (tasks: Task[], range: string): Promise<stri
   }
 };
 
+// Fix: Updated model to gemini-3-flash-preview
 export const chatWithCalendar = async (question: string, tasks: Task[]): Promise<string> => {
   try {
-    const ai = getAiClient();
-    if (!ai) return "Vui lòng cấu hình API Key để sử dụng tính năng này.";
-
     const today = new Date().toISOString().split('T')[0];
     const simpleTasks = tasks.map(t => ({
        title: t.title,
@@ -220,7 +202,7 @@ export const chatWithCalendar = async (question: string, tasks: Task[]): Promise
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: prompt,
     });
 

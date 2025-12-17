@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { TelegramConfig, Tag, COLOR_PALETTES, AppTheme } from '../types';
-import { X, Save, Key, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Sparkles, Palette } from 'lucide-react';
+import { X, Save, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Palette } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 import { ToastType } from './Toast';
 
@@ -43,9 +43,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [activeTab, setActiveTab] = useState<'general' | 'tags'>('general');
   const [newTagName, setNewTagName] = useState('');
   
-  // Gemini Key State
-  const [geminiKey, setGeminiKey] = useState('');
-  
   // Custom Dropdown State
   const [newTagColorKey, setNewTagColorKey] = useState('Gray');
   const [isColorDropdownOpen, setIsColorDropdownOpen] = useState(false);
@@ -57,8 +54,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     setConfig(telegramConfig);
     setCurrentTags(tags);
-    // Load Gemini Key từ LocalStorage khi mở modal
-    setGeminiKey(localStorage.getItem('gemini_api_key') || '');
   }, [telegramConfig, tags, isOpen]);
 
   // Click outside to close custom dropdown
@@ -109,7 +104,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] border border-primary-100 dark:border-gray-700">
         <div className="bg-gradient-to-r from-primary-500 to-primary-700 text-white px-6 py-4 flex justify-between items-center flex-shrink-0">
           <h2 className="text-lg font-bold flex items-center gap-2">
-            <Key size={20} /> Cài đặt Hệ thống
+            Cài đặt Hệ thống
           </h2>
           <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition"><X size={20} /></button>
         </div>
@@ -154,29 +149,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                    </div>
                  </div>
               )}
-
-              {/* Gemini Config */}
-              <div className="space-y-3">
-                 <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
-                  <Sparkles size={16} className="text-primary-500" /> Cấu hình Gemini AI
-                </h3>
-                
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">API Key (Google AI Studio)</label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      value={geminiKey}
-                      onChange={(e) => setGeminiKey(e.target.value)}
-                      placeholder="Nhập API Key để kích hoạt AI"
-                      className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none pr-10"
-                    />
-                  </div>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">
-                    Key được lưu trên trình duyệt của bạn (LocalStorage). Lấy key tại <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary-600 dark:text-primary-400 underline">aistudio.google.com</a>
-                  </p>
-                </div>
-              </div>
 
               <div className="space-y-4">
                 <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
@@ -320,13 +292,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             onClick={() => {
               onSaveConfig(config);
               onSaveTags(currentTags);
-              if (geminiKey) {
-                localStorage.setItem('gemini_api_key', geminiKey);
-                showToast("Đã lưu cấu hình & API Key!", "success");
-              } else {
-                localStorage.removeItem('gemini_api_key');
-                 showToast("Đã lưu cấu hình (Không có API Key)", "info");
-              }
+              showToast("Đã lưu cấu hình", "success");
               onClose();
             }}
             className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition shadow-md text-sm font-medium"
