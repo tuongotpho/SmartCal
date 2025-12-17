@@ -97,6 +97,17 @@ export const subscribeToTasks = (
       const date = safeString(data.date) || new Date().toISOString().split('T')[0];
       const endDate = safeString(data.endDate) || date;
 
+      // --- MIGRATION LOGIC FOR TAGS ---
+      let tags: string[] = [];
+      if (Array.isArray(data.tags)) {
+        tags = data.tags.filter((t: any) => typeof t === 'string');
+      } else if (typeof data.tag === 'string' && data.tag) {
+        // Fallback for old data structure
+        tags = [data.tag];
+      }
+      if (tags.length === 0) tags = ['Khác'];
+      // --------------------------------
+
       tasks.push({
         id: doc.id,
         userId: data.userId, // Có thể có hoặc không
@@ -109,8 +120,9 @@ export const subscribeToTasks = (
         completed: safeBoolean(data.completed),
         reminderSent: safeBoolean(data.reminderSent),
         recurringType: recType,
-        tag: safeString(data.tag),
-        subtasks: subtasks
+        tags: tags,
+        subtasks: subtasks,
+        customStatus: data.customStatus
       });
     });
 
@@ -214,8 +226,9 @@ export const addTaskToFirestore = async (task: Omit<Task, 'id'>) => {
       completed: task.completed,
       reminderSent: false,
       recurringType: task.recurringType || 'none',
-      tag: task.tag || 'Khác',
+      tags: task.tags || ['Khác'], // Save as array
       subtasks: task.subtasks || [],
+      customStatus: task.customStatus || 'todo',
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
@@ -240,14 +253,12 @@ export const updateTaskInFirestore = async (task: Task) => {
     // Loại bỏ các trường không cần thiết hoặc gây lỗi
     const { id, isRecurring, userId, ...dataToUpdate } = task; 
     
-    // Ép buộc userId trong data update phải khớp (hoặc không gửi userId để tránh ghi đè sai)
-    // Rule: resource.data.userId == request.auth.uid
-    // Ta chỉ update nội dung, không update userId (userId là bất biến)
     await taskRef.update({
         ...dataToUpdate,
         endDate: task.endDate || task.date,
         recurringType: task.recurringType || 'none',
         duration: task.duration || "",
+        tags: task.tags || ['Khác'], // Ensure tags is array
         subtasks: task.subtasks || []
     });
     return true;

@@ -24,8 +24,8 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
   const [isGeneratingSubtasks, setIsGeneratingSubtasks] = useState(false);
   
   const recognitionRef = useRef<any>(null);
-  const silenceTimerRef = useRef<any>(null); // Timer tự ngắt khi im lặng
-  const transcriptBufferRef = useRef<string>(""); // Bộ đệm chứa văn bản giọng nói
+  const silenceTimerRef = useRef<any>(null);
+  const transcriptBufferRef = useRef<string>("");
 
   useEffect(() => {
     if (task) {
@@ -33,11 +33,25 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
          ...task,
          endDate: task.endDate || task.date,
          recurringType: task.recurringType || (task.isRecurring ? 'daily' : 'none'),
-         tag: task.tag || 'Khác',
+         tags: task.tags || ['Khác'], // Default to array
          subtasks: task.subtasks || []
       });
     }
   }, [task]);
+
+  const toggleTag = (tagName: string) => {
+    if (!formData) return;
+    const currentTags = formData.tags || [];
+    let newTags = [];
+    if (currentTags.includes(tagName)) {
+        newTags = currentTags.filter(t => t !== tagName);
+    } else {
+        newTags = [...currentTags, tagName];
+    }
+    // Ensure at least one tag or empty array? Let's allow empty and default to 'Khác' on save if needed, 
+    // but better to allow multiple.
+    setFormData({ ...formData, tags: newTags });
+  };
 
   // Voice Input Logic
   const toggleVoiceInput = () => {
@@ -50,13 +64,11 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
         showToast("Trình duyệt không hỗ trợ nhận diện giọng nói.", "error");
         return;
       }
-      // Reset buffer
       transcriptBufferRef.current = "";
 
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.lang = 'vi-VN';
-      // Continuous = true để giữ mic mở, ta tự quản lý việc ngắt bằng timer
       recognitionRef.current.continuous = true; 
       recognitionRef.current.interimResults = true;
 
@@ -72,13 +84,11 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
       };
       
       recognitionRef.current.onresult = (event: any) => {
-        // Reset timer im lặng mỗi khi nhận được tín hiệu (interim hoặc final)
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
         silenceTimerRef.current = setTimeout(() => {
              if (recognitionRef.current) recognitionRef.current.stop();
-        }, 1500); // 1.5 giây im lặng -> Tự ngắt
+        }, 1500);
 
-        // Chỉ lấy các kết quả đã Final để tránh bị lặp hoặc rác
         for (let i = event.resultIndex; i < event.results.length; ++i) {
              if (event.results[i].isFinal) {
                  transcriptBufferRef.current += event.results[i][0].transcript + " ";
@@ -117,13 +127,12 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                     time: result.time,
                     description: (prev.description ? prev.description + "\n" : "") + (result.description || ""),
                     recurringType: (result.recurringType as RecurringType) || 'none',
-                    tag: result.tag || 'Khác'
+                    tags: result.tags || ['Khác']
                 };
             });
             showToast("Đã điền thông tin từ giọng nói!", "success");
         } else {
             showToast("AI không trích xuất được thông tin.", "warning");
-            // Nếu AI fail, ít nhất điền text vào title
             setFormData(prev => prev ? ({ ...prev, title: text }) : null);
         }
     } catch (e) {
@@ -298,7 +307,7 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
              </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-3">
              {/* Recurring Select */}
             <div className="flex flex-col gap-1">
                <label className="text-xs font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1">
@@ -317,20 +326,30 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                </select>
             </div>
 
-            {/* Tag Select */}
+            {/* Multi-Tag Selection */}
             <div className="flex flex-col gap-1">
                <label className="text-xs font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1">
-                  <TagIcon size={14} /> Phân loại
+                  <TagIcon size={14} /> Phân loại (Chọn nhiều)
                </label>
-               <select
-                  value={formData.tag || 'Khác'}
-                  onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
-                  className="w-full bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200 text-xs font-semibold rounded px-2 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
-               >
-                  {tags.map(t => (
-                    <option key={t.name} value={t.name} className="bg-white dark:bg-gray-800">{t.name}</option>
-                  ))}
-               </select>
+               <div className="flex flex-wrap gap-2">
+                  {tags.map(t => {
+                    const isSelected = (formData.tags || []).includes(t.name);
+                    return (
+                        <button
+                            key={t.name}
+                            onClick={() => toggleTag(t.name)}
+                            className={`text-xs px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5 ${
+                                isSelected 
+                                ? `${t.color} border-current ring-1 ring-offset-1 dark:ring-offset-gray-800 font-bold shadow-sm`
+                                : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
+                            }`}
+                        >
+                            <span className={`w-2 h-2 rounded-full ${isSelected ? t.dot : 'bg-gray-300'}`}></span>
+                            {t.name}
+                        </button>
+                    )
+                  })}
+               </div>
             </div>
           </div>
 
@@ -432,7 +451,8 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                 showToast("Vui lòng nhập tiêu đề và ngày bắt đầu", "warning");
                 return;
               }
-              onSave(formData);
+              const finalTags = formData.tags && formData.tags.length > 0 ? formData.tags : ['Khác'];
+              onSave({ ...formData, tags: finalTags });
               onClose();
             }}
             className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition shadow-md text-sm font-medium"

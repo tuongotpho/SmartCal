@@ -5,7 +5,8 @@ import {
   LayoutGrid, 
   Plus, 
   PieChart, 
-  Settings 
+  Settings,
+  GanttChartSquare
 } from 'lucide-react';
 import { ViewMode } from '../types';
 
@@ -23,33 +24,39 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
   onOpenSettings
 }) => {
   return (
-    // FIX: Sử dụng env(safe-area-inset-bottom, 20px) làm fallback để đảm bảo menu không sát đáy trên các máy vuốt cử chỉ
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-orange-100 dark:border-gray-800 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40 pb-[env(safe-area-inset-bottom,20px)] h-auto min-h-[64px]">
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-primary-100 dark:border-gray-800 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40 pb-[env(safe-area-inset-bottom,20px)] h-auto min-h-[64px]">
       <div className="grid grid-cols-5 h-[64px] items-center max-w-md mx-auto">
         {/* 1. Dashboard */}
-        <button onClick={() => setViewMode(ViewMode.LIST)} className={`flex flex-col items-center justify-center gap-0.5 h-full active:scale-95 transition-all ${viewMode === ViewMode.LIST ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>
+        <button onClick={() => setViewMode(ViewMode.LIST)} className={`flex flex-col items-center justify-center gap-0.5 h-full active:scale-95 transition-all ${viewMode === ViewMode.LIST ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>
           <Layout size={22} strokeWidth={viewMode === ViewMode.LIST ? 2.5 : 2} />
           <span className="text-[9px] font-medium">Dashboard</span>
         </button>
 
-        {/* 2. Calendar */}
-        <button onClick={() => setViewMode(ViewMode.MONTH)} className={`flex flex-col items-center justify-center gap-0.5 h-full active:scale-95 transition-all ${viewMode === ViewMode.MONTH ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>
-          <LayoutGrid size={22} strokeWidth={viewMode === ViewMode.MONTH ? 2.5 : 2} />
-          <span className="text-[9px] font-medium">Lịch</span>
+        {/* 2. Timeline (Replaced Calendar on Mobile for easier access, or keep Calendar) 
+            Let's keep Calendar but maybe swap Stats or add logic. 
+            For now, stick to original icons but add Timeline logic? 
+            Actually user might want Timeline on mobile. Let's use Gantt Icon for Timeline if selected, else Calendar.
+        */}
+        <button 
+           onClick={() => setViewMode(ViewMode.MONTH)} 
+           className={`flex flex-col items-center justify-center gap-0.5 h-full active:scale-95 transition-all ${viewMode === ViewMode.MONTH || viewMode === ViewMode.TIMELINE ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+        >
+          {viewMode === ViewMode.TIMELINE ? <GanttChartSquare size={22} strokeWidth={2.5}/> : <LayoutGrid size={22} strokeWidth={viewMode === ViewMode.MONTH ? 2.5 : 2} />}
+          <span className="text-[9px] font-medium">{viewMode === ViewMode.TIMELINE ? 'Timeline' : 'Lịch'}</span>
         </button>
         
         {/* 3. Center FAB (Floating Action Button) */}
         <div className="relative flex justify-center items-center h-full pointer-events-none">
           <button 
              onClick={onCreateNewTask}
-             className="pointer-events-auto absolute -top-6 bg-gradient-to-tr from-orange-500 to-red-600 text-white p-3.5 rounded-full shadow-xl shadow-orange-500/30 border-4 border-[#fff7ed] dark:border-gray-950 active:scale-90 transition-all hover:scale-105"
+             className="pointer-events-auto absolute -top-6 bg-gradient-to-tr from-primary-500 to-primary-700 text-white p-3.5 rounded-full shadow-xl shadow-primary-500/30 border-4 border-[#fff7ed] dark:border-gray-950 active:scale-90 transition-all hover:scale-105"
           >
              <Plus size={28} />
           </button>
         </div>
 
         {/* 4. Stats */}
-        <button onClick={() => setViewMode(ViewMode.STATS)} className={`flex flex-col items-center justify-center gap-0.5 h-full active:scale-95 transition-all ${viewMode === ViewMode.STATS ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>
+        <button onClick={() => setViewMode(ViewMode.STATS)} className={`flex flex-col items-center justify-center gap-0.5 h-full active:scale-95 transition-all ${viewMode === ViewMode.STATS ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>
           <PieChart size={22} strokeWidth={viewMode === ViewMode.STATS ? 2.5 : 2} />
           <span className="text-[9px] font-medium">Thống kê</span>
         </button>

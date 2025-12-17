@@ -52,11 +52,17 @@ const StatsView: React.FC<StatsViewProps> = ({ currentDate, tasks, tags }) => {
     const pending = total - completed;
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-    // Group by Tag
+    // Group by Tag (Counting distinct mentions)
     const tagCounts: Record<string, number> = {};
+    let totalTagsCount = 0;
+
     tasksInMonth.forEach(t => {
-      const tagName = t.tag || 'Khác';
-      tagCounts[tagName] = (tagCounts[tagName] || 0) + 1;
+      // Loop through all tags of a task
+      const taskTags = (t.tags && t.tags.length > 0) ? t.tags : ['Khác'];
+      taskTags.forEach(tagName => {
+          tagCounts[tagName] = (tagCounts[tagName] || 0) + 1;
+          totalTagsCount++;
+      });
     });
 
     // Format data for chart
@@ -66,24 +72,24 @@ const StatsView: React.FC<StatsViewProps> = ({ currentDate, tasks, tags }) => {
         return {
           name,
           count,
-          percentage: (count / total) * 100,
+          percentage: totalTagsCount > 0 ? (count / totalTagsCount) * 100 : 0, // % relative to total tag occurrences
           color: tag ? (TAILWIND_COLOR_MAP[tag.dot] || '#cbd5e1') : '#cbd5e1',
           tailwindDot: tag?.dot || 'bg-gray-400'
         };
       })
       .sort((a, b) => b.count - a.count); // Sort desc
 
-    return { total, completed, pending, completionRate, chartData, tasksInMonth };
+    return { total, completed, pending, completionRate, chartData, tasksInMonth, totalTagsCount };
   }, [currentDate, tasks, tags]);
 
   // 2. Generate Conic Gradient String for Chart
   const gradientString = useMemo(() => {
-    if (monthStats.total === 0) return 'conic-gradient(#f3f4f6 0% 100%)';
+    if (monthStats.totalTagsCount === 0) return 'conic-gradient(#f3f4f6 0% 100%)';
     
     let currentDeg = 0;
     const segments = monthStats.chartData.map(item => {
       const start = currentDeg;
-      const deg = (item.count / monthStats.total) * 360;
+      const deg = (item.count / monthStats.totalTagsCount) * 360;
       currentDeg += deg;
       return `${item.color} ${start}deg ${currentDeg}deg`;
     });
@@ -99,13 +105,19 @@ const StatsView: React.FC<StatsViewProps> = ({ currentDate, tasks, tags }) => {
          </h2>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-shrink-0">
+      {/* Unified Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-shrink-0">
+        
+        {/* --- Row 1: Summary Cards --- */}
+        
+        {/* Card 1: Total */}
         <div className="bg-white dark:bg-gray-800 p-3 lg:p-4 rounded-xl shadow-sm border border-orange-100 dark:border-gray-700 flex flex-row sm:flex-col items-center justify-between sm:justify-center">
           <div className="text-gray-500 dark:text-gray-400 text-xs font-semibold uppercase mb-0 sm:mb-1">Tổng việc</div>
           <div className="text-2xl lg:text-3xl font-bold text-gray-800 dark:text-gray-100">{monthStats.total}</div>
           <div className="text-[10px] text-gray-400 mt-0 sm:mt-1">công việc</div>
         </div>
+
+        {/* Card 2: Done */}
         <div className="bg-white dark:bg-gray-800 p-3 lg:p-4 rounded-xl shadow-sm border border-orange-100 dark:border-gray-700 flex flex-row sm:flex-col items-center justify-between sm:justify-center">
           <div className="text-green-600 dark:text-green-400 text-xs font-semibold uppercase mb-0 sm:mb-1">Đã xong</div>
           <div className="text-2xl lg:text-3xl font-bold text-green-600 dark:text-green-400">{monthStats.completed}</div>
@@ -113,6 +125,8 @@ const StatsView: React.FC<StatsViewProps> = ({ currentDate, tasks, tags }) => {
              <CheckCircle2 size={10}/> Hoàn thành
           </div>
         </div>
+
+        {/* Card 3: Rate */}
         <div className="bg-white dark:bg-gray-800 p-3 lg:p-4 rounded-xl shadow-sm border border-orange-100 dark:border-gray-700 flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-2">
           <div className="flex flex-col items-start sm:items-center">
              <div className="text-blue-600 dark:text-blue-400 text-xs font-semibold uppercase mb-0 sm:mb-1">Tỷ lệ</div>
@@ -122,20 +136,18 @@ const StatsView: React.FC<StatsViewProps> = ({ currentDate, tasks, tags }) => {
              <div className="bg-blue-500 h-full rounded-full transition-all duration-1000" style={{ width: `${monthStats.completionRate}%` }}></div>
           </div>
         </div>
-      </div>
 
-      {/* Main Content Area - Flex Column on Mobile, Row on Desktop */}
-      <div className="flex flex-col md:flex-row gap-4 shrink-0">
-        
-        {/* Chart Card */}
-        <div className="flex-1 bg-white dark:bg-gray-800 p-4 lg:p-6 rounded-xl shadow-sm border border-orange-100 dark:border-gray-700 flex flex-col h-auto">
-          <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2 mb-6">
+        {/* --- Row 2: Charts & Insights --- */}
+
+        {/* Big Card: Pie Chart (Spans 2 columns on desktop) */}
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-4 lg:p-6 rounded-xl shadow-sm border border-orange-100 dark:border-gray-700 flex flex-col h-auto min-h-[250px]">
+          <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2 mb-4">
             <PieChart size={16} className="text-orange-500"/> Phân bổ theo Thẻ
           </h3>
           
-          <div className="flex flex-col md:flex-row items-center justify-center gap-6 w-full h-full">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-6 w-full h-full flex-1">
             {monthStats.total === 0 ? (
-              <div className="text-center text-gray-400 flex flex-col items-center py-8">
+              <div className="text-center text-gray-400 flex flex-col items-center justify-center h-full">
                  <AlertCircle size={48} className="mb-2 opacity-50"/>
                  <p>Chưa có dữ liệu trong tháng này.</p>
               </div>
@@ -153,7 +165,7 @@ const StatsView: React.FC<StatsViewProps> = ({ currentDate, tasks, tags }) => {
                   </div>
                 </div>
 
-                {/* Legend - With max-height scroll on mobile */}
+                {/* Legend */}
                 <div className="w-full md:w-auto min-w-[180px] max-h-56 md:max-h-none overflow-y-auto custom-scrollbar pr-1">
                    <div className="flex flex-col gap-2">
                      {monthStats.chartData.map((item, idx) => (
@@ -175,13 +187,13 @@ const StatsView: React.FC<StatsViewProps> = ({ currentDate, tasks, tags }) => {
           </div>
         </div>
         
-        {/* Monthly Goals / Insights Card */}
-        <div className="md:w-1/3 bg-white dark:bg-gray-800 p-4 lg:p-5 rounded-xl shadow-sm border border-orange-100 dark:border-gray-700 flex flex-col h-auto">
+        {/* Side Card: Goals (Spans 1 column) */}
+        <div className="lg:col-span-1 bg-white dark:bg-gray-800 p-4 lg:p-5 rounded-xl shadow-sm border border-orange-100 dark:border-gray-700 flex flex-col h-auto">
            <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
              <Target size={16} className="text-red-500"/> Mục tiêu & Xu hướng
            </h3>
            
-           <div className="space-y-4">
+           <div className="space-y-4 flex-1">
               <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-100 dark:border-red-900/30">
                  <div className="text-xs text-red-600 dark:text-red-400 font-bold mb-1">Công việc chưa xong</div>
                  <div className="text-xl font-bold text-red-700 dark:text-red-300 flex items-center gap-2">
@@ -195,7 +207,7 @@ const StatsView: React.FC<StatsViewProps> = ({ currentDate, tasks, tags }) => {
                     {monthStats.chartData.length > 0 ? monthStats.chartData[0].name : "N/A"}
                  </div>
                  <div className="text-xs text-orange-500 dark:text-orange-300 mt-1">
-                    Chiếm {monthStats.chartData.length > 0 ? Math.round(monthStats.chartData[0].percentage) : 0}% quỹ thời gian
+                    Chiếm {monthStats.chartData.length > 0 ? Math.round(monthStats.chartData[0].percentage) : 0}% sự quan tâm
                  </div>
               </div>
            </div>
@@ -206,6 +218,7 @@ const StatsView: React.FC<StatsViewProps> = ({ currentDate, tasks, tags }) => {
               </p>
            </div>
         </div>
+
       </div>
     </div>
   );

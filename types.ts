@@ -3,7 +3,7 @@ export type RecurringType = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export interface Tag {
   name: string;
-  color: string; // Tailwind classes string (bg-..., border-..., text-...)
+  color: string; // Tailwind classes string
   dot: string;   // Tailwind class for dot color
 }
 
@@ -15,22 +15,20 @@ export interface Subtask {
 
 export interface Task {
   id: string;
-  userId?: string; // ID của người tạo task
+  userId?: string; 
   title: string;
-  date: string; // Format: YYYY-MM-DD (Ngày bắt đầu)
-  endDate?: string; // Format: YYYY-MM-DD (Ngày kết thúc - New)
+  date: string; // Format: YYYY-MM-DD 
+  endDate?: string; 
   time: string; // Format: HH:mm
-  duration?: string; // Thời lượng công việc (VD: 30p, 1h)
+  duration?: string; 
   description?: string;
   completed: boolean;
   reminderSent?: boolean;
   recurringType?: RecurringType;
-  isRecurring?: boolean; // Deprecated
-  tag?: string; // Tên thẻ (VD: Công việc, Gia đình)
-  color?: string; // Deprecated in favor of tag lookup
-  subtasks?: Subtask[]; // Danh sách công việc con
-  
-  // New field for Kanban
+  isRecurring?: boolean; 
+  tags: string[]; // Changed from optional string to string array
+  color?: string; 
+  subtasks?: Subtask[]; 
   customStatus?: 'todo' | 'in_progress' | 'done'; 
 }
 
@@ -45,10 +43,17 @@ export enum ViewMode {
   DAY = 'DAY',
   LIST = 'LIST',
   STATS = 'STATS',
-  KANBAN = 'KANBAN' // New Mode
+  KANBAN = 'KANBAN',
+  TIMELINE = 'TIMELINE' // New View
 }
 
-// Updated Palettes with Dark Mode support (dark:...)
+export interface AppTheme {
+  name: string;
+  label: string;
+  colors: Record<number, string>; // 50, 100, ... 950 -> RGB String "r g b"
+}
+
+// Updated Palettes with Dark Mode support
 export const COLOR_PALETTES: Record<string, { color: string, dot: string, label: string }> = {
   Red: { color: 'bg-red-100 border-red-300 text-red-800 dark:bg-red-900/30 dark:border-red-800 dark:text-red-200', dot: 'bg-red-500', label: 'Đỏ' },
   Orange: { color: 'bg-orange-100 border-orange-300 text-orange-800 dark:bg-orange-900/30 dark:border-orange-800 dark:text-orange-200', dot: 'bg-orange-500', label: 'Cam' },

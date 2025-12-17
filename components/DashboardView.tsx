@@ -20,6 +20,7 @@ interface DashboardViewProps {
   onToggleComplete: (task: Task) => void;
   onOpenEditModal: (task: Task) => void;
   onDeleteTask: (id: string) => void;
+  onTagClick: (tagName: string) => void;
 }
 
 const DashboardView: React.FC<DashboardViewProps> = ({
@@ -27,7 +28,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({
   tags,
   onToggleComplete,
   onOpenEditModal,
-  onDeleteTask
+  onDeleteTask,
+  onTagClick
 }) => {
   const [mobileListTab, setMobileListTab] = useState<'past' | 'today' | 'upcoming'>('today');
 
@@ -63,7 +65,9 @@ const DashboardView: React.FC<DashboardViewProps> = ({
       });
 
   const renderTaskCard = (task: Task) => {
-      const tagConfig = tags.find(t => t.name === task.tag) || tags.find(t => t.name === 'Khác');
+      // Use first tag for styling the time box
+      const mainTagName = task.tags && task.tags.length > 0 ? task.tags[0] : 'Khác';
+      const mainTagConfig = tags.find(t => t.name === mainTagName) || tags.find(t => t.name === 'Khác');
       
       // Check multi-day for label
       const isMultiDay = task.endDate && task.endDate !== task.date;
@@ -74,19 +78,32 @@ const DashboardView: React.FC<DashboardViewProps> = ({
               {task.completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}
               </button>
               <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenEditModal(task)}>
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className="text-xs font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{task.time}</span>
                   {task.duration && (
                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 flex items-center gap-0.5 border border-blue-100 dark:border-blue-800">
                        <Timer size={10} /> {task.duration}
                     </span>
                   )}
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${task.completed ? 'bg-gray-100 text-gray-500' : (tagConfig?.color || 'bg-gray-100 text-gray-700')}`}>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${task.completed ? 'bg-gray-100 text-gray-500' : (mainTagConfig?.color || 'bg-gray-100 text-gray-700')}`}>
                       {task.date}
                       {isMultiDay && <span className="ml-1 opacity-70">→ {task.endDate}</span>}
                   </span>
                   {task.recurringType !== 'none' && <Repeat size={12} className="text-blue-500" />}
-                  <span className={`w-2 h-2 rounded-full ${tagConfig?.dot}`}></span>
+                  
+                  {/* Multi Tags */}
+                  {(task.tags || []).map(tagName => {
+                      const tConf = tags.find(t => t.name === tagName);
+                      if (!tConf) return null;
+                      return (
+                        <span 
+                          key={tagName} 
+                          className={`w-2 h-2 rounded-full ${tConf.dot} cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-gray-300 dark:hover:ring-gray-600 transition-all`} 
+                          title={`Lọc theo: ${tagName}`}
+                          onClick={(e) => { e.stopPropagation(); onTagClick(tagName); }}
+                        ></span>
+                      )
+                  })}
               </div>
               <h3 className={`font-semibold text-sm truncate text-gray-800 dark:text-gray-200`}>{task.title}</h3>
               {task.description && <p className="text-xs text-gray-500 truncate">{task.description}</p>}

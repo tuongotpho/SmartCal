@@ -17,6 +17,7 @@ interface KanbanViewProps {
   onToggleComplete: (task: Task) => void;
   onOpenEditModal: (task: Task) => void;
   onUpdateStatus: (taskId: string, status: 'todo' | 'in_progress' | 'done') => void;
+  onTagClick: (tagName: string) => void;
 }
 
 const KanbanView: React.FC<KanbanViewProps> = ({
@@ -24,7 +25,8 @@ const KanbanView: React.FC<KanbanViewProps> = ({
   tags,
   onToggleComplete,
   onOpenEditModal,
-  onUpdateStatus
+  onUpdateStatus,
+  onTagClick
 }) => {
 
   // Phân loại task vào 3 cột dựa trên customStatus hoặc fallback logic
@@ -51,7 +53,6 @@ const KanbanView: React.FC<KanbanViewProps> = ({
   };
 
   const renderCard = (task: Task) => {
-    const tagConfig = tags.find(t => t.name === task.tag) || tags.find(t => t.name === 'Khác');
     
     return (
       <div 
@@ -62,9 +63,21 @@ const KanbanView: React.FC<KanbanViewProps> = ({
         className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group"
       >
         <div className="flex justify-between items-start mb-2">
-           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${tagConfig?.color || 'bg-gray-100 text-gray-600'}`}>
-             {task.tag}
-           </span>
+           <div className="flex flex-wrap gap-1">
+             {(task.tags || []).map(tagName => {
+               const tagConfig = tags.find(t => t.name === tagName) || tags.find(t => t.name === 'Khác');
+               return (
+                 <span 
+                    key={tagName} 
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${tagConfig?.color || 'bg-gray-100 text-gray-600'} cursor-pointer hover:brightness-95`}
+                    onClick={(e) => { e.stopPropagation(); onTagClick(tagName); }}
+                    title={`Lọc theo: ${tagName}`}
+                 >
+                   {tagName}
+                 </span>
+               )
+             })}
+           </div>
            <button className="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition">
              <MoreHorizontal size={14} />
            </button>

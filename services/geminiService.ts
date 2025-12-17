@@ -14,7 +14,7 @@ const getAiClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-export const parseTaskWithGemini = async (input: string, availableTags: string[]): Promise<{ title: string; date: string; endDate: string; time: string; duration: string; description: string; recurringType: string; tag: string } | null> => {
+export const parseTaskWithGemini = async (input: string, availableTags: string[]): Promise<{ title: string; date: string; endDate: string; time: string; duration: string; description: string; recurringType: string; tags: string[] } | null> => {
   try {
     const ai = getAiClient();
     if (!ai) throw new Error("Vui lòng nhập API Key Gemini trong phần Cài đặt.");
@@ -44,9 +44,9 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
       - Nếu có thông tin về thời gian kéo dài (VD: "trong 30 phút", "1 tiếng", "1h30p"), hãy trích xuất vào duration (dạng text ngắn gọn).
       - Nếu không có, để trống.
 
-      Quy tắc phân loại Thẻ (tag):
-      - Dựa vào nội dung để đoán 1 trong các thẻ sau: ${JSON.stringify(tagsToUse)}.
-      - Nếu không chắc chắn, hãy chọn thẻ phù hợp nhất hoặc "Khác".
+      Quy tắc phân loại Thẻ (tags):
+      - Chọn 1 hoặc nhiều thẻ phù hợp nhất từ danh sách sau: ${JSON.stringify(tagsToUse)}.
+      - Trả về mảng các string. Nếu không chắc, chọn ["Khác"].
 
       Trả về JSON.
     `;
@@ -66,7 +66,7 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
             duration: { type: Type.STRING, description: "Thời lượng công việc (VD: 30p, 1h). Để trống nếu không có." },
             description: { type: Type.STRING, description: "Chi tiết công việc hoặc ghi chú thêm" },
             recurringType: { type: Type.STRING, enum: ['none', 'daily', 'weekly', 'monthly', 'yearly'], description: "Loại lặp lại" },
-            tag: { type: Type.STRING, enum: tagsToUse, description: "Phân loại công việc" }
+            tags: { type: Type.ARRAY, items: { type: Type.STRING, enum: tagsToUse }, description: "Danh sách thẻ phân loại" }
           },
           required: ["title", "date", "time"]
         }
@@ -76,6 +76,7 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
     if (response.text) {
       const data = JSON.parse(response.text);
       if (!data.endDate) data.endDate = data.date;
+      if (!data.tags || data.tags.length === 0) data.tags = ['Khác'];
       return data;
     }
     return null;
@@ -135,7 +136,7 @@ export const generateReport = async (tasks: Task[], range: string): Promise<stri
       date: t.date,
       endDate: t.endDate,
       status: t.completed ? "Đã xong" : "Chưa xong",
-      tag: t.tag || "Khác"
+      tags: t.tags?.join(", ") || "Khác"
     }));
 
     const prompt = `
@@ -182,7 +183,7 @@ export const chatWithCalendar = async (question: string, tasks: Task[]): Promise
        date: t.date,
        time: t.time,
        status: t.completed ? "Đã hoàn thành" : "Chưa làm",
-       tag: t.tag,
+       tags: t.tags,
        description: t.description
     }));
 

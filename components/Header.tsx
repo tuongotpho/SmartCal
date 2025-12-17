@@ -10,7 +10,9 @@ import {
   Moon, 
   Settings, 
   LogOut, 
-  User
+  User,
+  PanelRightClose,
+  PanelRightOpen
 } from 'lucide-react';
 import { format } from 'date-fns';
 import DatePickerPopover from './DatePickerPopover';
@@ -36,6 +38,8 @@ interface HeaderProps {
   onLogout: () => void;
   datePickerRef: React.RefObject<HTMLDivElement>;
   searchInputRef: React.RefObject<HTMLInputElement>;
+  isSidebarOpen: boolean;
+  setIsSidebarOpen: (open: boolean) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -57,12 +61,12 @@ const Header: React.FC<HeaderProps> = ({
   setIsSettingsOpen,
   onLogout,
   datePickerRef,
-  searchInputRef
+  searchInputRef,
+  isSidebarOpen,
+  setIsSidebarOpen
 }) => {
   return (
-    // FIX: Sử dụng px-3 pb-3 thay vì p-3 để không ghi đè padding-top
-    // pt-[calc(0.75rem+env(safe-area-inset-top,0px))] đảm bảo cách lề trên ít nhất 12px + chiều cao tai thỏ
-    <div className="bg-gradient-to-r from-orange-500/95 to-red-600/95 backdrop-blur-md text-white px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] shadow-md z-30 flex-shrink-0 sticky top-0 transition-all">
+    <div className="bg-gradient-to-r from-primary-500/95 to-primary-700/95 backdrop-blur-md text-white px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] shadow-md z-30 flex-shrink-0 sticky top-0 transition-all">
       <div className="flex justify-between items-center px-1 lg:px-4">
         <div className="flex items-center gap-2">
           <div className="hidden sm:block">
@@ -155,6 +159,15 @@ const Header: React.FC<HeaderProps> = ({
             <Settings size={20} /> <span className="hidden sm:inline">Cài đặt</span>
           </button>
           
+          {/* Toggle Sidebar (New) */}
+          <button 
+             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+             className="hidden lg:flex hover:bg-white/20 p-2 rounded-full transition text-xs font-semibold backdrop-blur-sm active:scale-95"
+             title={isSidebarOpen ? "Ẩn thanh công cụ" : "Hiện thanh công cụ"}
+          >
+             {isSidebarOpen ? <PanelRightClose size={20} /> : <PanelRightOpen size={20} />}
+          </button>
+
           {/* Logout Button */}
           <button 
             onClick={onLogout} 

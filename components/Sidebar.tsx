@@ -194,7 +194,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     try {
         const apiKey = localStorage.getItem('gemini_api_key');
-        let taskData: { title: string; date: string; time: string; duration?: string; description?: string; tag?: string } | null = null;
+        let taskData: { title: string; date: string; time: string; duration?: string; description?: string; tags?: string[] } | null = null;
         let method = 'manual';
 
         // 1. AI Parsing
@@ -217,7 +217,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             taskData = {
                 ...manualResult,
                 description: "Tạo nhanh (Không dùng AI)",
-                tag: 'Khác'
+                tags: ['Khác']
             };
             method = 'manual';
         }
@@ -234,7 +234,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 completed: false,
                 reminderSent: false,
                 recurringType: (taskData as any).recurringType || 'none',
-                tag: taskData.tag || 'Khác',
+                tags: taskData.tags || ['Khác'],
                 subtasks: []
               };
               await onAddTask(newTask);
@@ -285,7 +285,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       completed: false,
       reminderSent: false,
       recurringType: manualForm.recurringType,
-      tag: manualForm.tag,
+      tags: [manualForm.tag],
       subtasks: subtasks
     };
 
@@ -301,20 +301,20 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <div className="hidden lg:flex w-[320px] bg-white dark:bg-gray-900 border-l border-orange-200 dark:border-gray-800 shadow-xl z-20 flex-col order-2 h-full">
+    <div className="flex flex-col h-full w-full bg-white dark:bg-gray-900 overflow-hidden">
        {/* Quick Add Area */}
-       <div className="p-4 bg-orange-50 dark:bg-gray-800 border-b border-orange-200 dark:border-gray-700 flex-shrink-0">
-          <h2 className="font-bold text-orange-800 dark:text-orange-400 flex items-center gap-2 mb-3">
-            <CalendarPlus size={16} className="text-orange-500" /> Thêm công việc mới
+       <div className="p-4 bg-primary-50 dark:bg-gray-800 border-b border-primary-200 dark:border-gray-700 flex-shrink-0">
+          <h2 className="font-bold text-primary-800 dark:text-primary-400 flex items-center gap-2 mb-3">
+            <CalendarPlus size={16} className="text-primary-500" /> Thêm công việc mới
           </h2>
           
           {/* Tabs Switcher */}
-          <div className="flex gap-1 mb-3 bg-white dark:bg-gray-700 p-1 rounded-lg border border-orange-100 dark:border-gray-600 shadow-sm">
+          <div className="flex gap-1 mb-3 bg-white dark:bg-gray-700 p-1 rounded-lg border border-primary-100 dark:border-gray-600 shadow-sm">
               <button 
                 onClick={() => setSidebarTab('manual')}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-md transition-all ${
                   sidebarTab === 'manual' 
-                    ? 'bg-orange-100 dark:bg-gray-600 text-orange-700 dark:text-white shadow-sm' 
+                    ? 'bg-primary-100 dark:bg-gray-600 text-primary-700 dark:text-white shadow-sm' 
                     : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
                 }`}
               >
@@ -324,7 +324,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setSidebarTab('ai')}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-md transition-all ${
                   sidebarTab === 'ai' 
-                    ? 'bg-orange-100 dark:bg-gray-600 text-orange-700 dark:text-white shadow-sm' 
+                    ? 'bg-primary-100 dark:bg-gray-600 text-primary-700 dark:text-white shadow-sm' 
                     : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
                 }`}
               >
@@ -341,13 +341,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onChange={(e) => setQuickInput(e.target.value)}
                 placeholder="VD: Họp 9h sáng mai... (Hỗ trợ giọng nói)"
                 style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
-                className="w-full border border-orange-200 dark:border-gray-600 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none min-h-[120px] resize-none shadow-inner bg-white dark:bg-gray-700 dark:text-white"
+                className="w-full border border-primary-200 dark:border-gray-600 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none min-h-[120px] resize-none shadow-inner bg-white dark:bg-gray-700 dark:text-white"
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleQuickAdd(); } }}
               />
-              <button onClick={toggleVoiceInput} className={`absolute bottom-2 left-2 p-1.5 rounded-full transition-all shadow-sm ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-white dark:bg-gray-600 text-gray-500 dark:text-gray-300 hover:text-orange-600 border dark:border-gray-500'}`}>
+              <button onClick={toggleVoiceInput} className={`absolute bottom-2 left-2 p-1.5 rounded-full transition-all shadow-sm ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-white dark:bg-gray-600 text-gray-500 dark:text-gray-300 hover:text-primary-600 border dark:border-gray-500'}`}>
                 {isListening ? <MicOff size={14} /> : <Mic size={14} />}
               </button>
-              <button onClick={handleQuickAdd} disabled={isProcessingAI || !quickInput.trim()} className={`absolute bottom-2 right-2 p-1.5 rounded-md transition-all shadow-sm ${isProcessingAI ? 'bg-gray-200 dark:bg-gray-600' : 'bg-orange-600 text-white'}`}>
+              <button onClick={handleQuickAdd} disabled={isProcessingAI || !quickInput.trim()} className={`absolute bottom-2 right-2 p-1.5 rounded-md transition-all shadow-sm ${isProcessingAI ? 'bg-gray-200 dark:bg-gray-600' : 'bg-primary-600 text-white'}`}>
                 {isProcessingAI ? <RefreshCw size={14} className="animate-spin" /> : <ChevronRight size={14} />}
               </button>
               <p className="text-[10px] text-gray-400 mt-2 italic text-center">
@@ -363,7 +363,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     value={manualForm.title}
                     onChange={(e) => setManualForm({...manualForm, title: e.target.value})}
                     placeholder="Tiêu đề công việc"
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
                  />
                </div>
                
@@ -375,7 +375,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                          type="date"
                          value={manualForm.date}
                          onChange={(e) => setManualForm({...manualForm, date: e.target.value})}
-                         className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
+                         className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
                        />
                    </div>
                     <div>
@@ -385,7 +385,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                          min={manualForm.date}
                          value={manualForm.endDate}
                          onChange={(e) => setManualForm({...manualForm, endDate: e.target.value})}
-                         className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
+                         className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
                        />
                    </div>
                </div>
@@ -398,7 +398,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       type="time"
                       value={manualForm.time}
                       onChange={(e) => setManualForm({...manualForm, time: e.target.value})}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
                     />
                   </div>
                   <div>
@@ -406,7 +406,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <select
                         value={manualForm.tag}
                         onChange={(e) => setManualForm({ ...manualForm, tag: e.target.value })}
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
                     >
                         {tags.map(t => (
                             <option key={t.name} value={t.name}>{t.name}</option>
@@ -421,7 +421,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <select
                         value={manualForm.recurringType}
                         onChange={(e) => setManualForm({ ...manualForm, recurringType: e.target.value as RecurringType })}
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
                     >
                         <option value="none">Không lặp lại</option>
                         <option value="daily">Hàng ngày</option>
@@ -438,7 +438,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         value={manualForm.description}
                         onChange={(e) => setManualForm({ ...manualForm, description: e.target.value })}
                         placeholder="Chi tiết / Ghi chú..."
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-orange-500 outline-none resize-none bg-white dark:bg-gray-700 dark:text-white"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary-500 outline-none resize-none bg-white dark:bg-gray-700 dark:text-white"
                     />
                </div>
 
@@ -449,13 +449,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                         value={manualForm.checklistText}
                         onChange={(e) => setManualForm({ ...manualForm, checklistText: e.target.value })}
                         placeholder="Checklist (mỗi dòng 1 việc)..."
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-orange-500 outline-none resize-none bg-white dark:bg-gray-700 dark:text-white border-dashed"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary-500 outline-none resize-none bg-white dark:bg-gray-700 dark:text-white border-dashed"
                     />
                </div>
 
                <button 
                 onClick={handleManualSubmit}
-                className="w-full bg-orange-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-orange-700 transition flex items-center justify-center gap-2 shadow-sm active:scale-95"
+                className="w-full bg-primary-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-primary-700 transition flex items-center justify-center gap-2 shadow-sm active:scale-95"
                >
                  <Plus size={14} /> Tạo công việc
                </button>
@@ -464,7 +464,7 @@ const Sidebar: React.FC<SidebarProps> = ({
        </div>
 
        {/* Button Bar */}
-       <div className="p-4 border-b border-orange-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex-shrink-0">
+       <div className="p-4 border-b border-primary-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex-shrink-0">
          <button 
            onClick={onGenerateReport}
            disabled={isReportLoading}
@@ -490,8 +490,8 @@ const Sidebar: React.FC<SidebarProps> = ({
            )}
        </div>
        
-       <div className="p-2 border-t border-orange-100 dark:border-gray-800 text-[10px] text-center text-gray-400 bg-orange-50 dark:bg-gray-800 flex-shrink-0">
-         v2.6.0 • SmartCal Pro • AI Powered
+       <div className="p-2 border-t border-primary-100 dark:border-gray-800 text-[10px] text-center text-gray-400 bg-primary-50 dark:bg-gray-800 flex-shrink-0">
+         v2.7.0 • SmartCal Pro • AI Powered
        </div>
     </div>
   );

@@ -24,6 +24,20 @@
                 750: '#2d3748',
                 850: '#1a202c',
                 950: '#0d1117',
+              },
+              // Define Primary color using CSS variables for Dynamic Theming
+              primary: {
+                50: 'rgb(var(--color-primary-50) / <alpha-value>)',
+                100: 'rgb(var(--color-primary-100) / <alpha-value>)',
+                200: 'rgb(var(--color-primary-200) / <alpha-value>)',
+                300: 'rgb(var(--color-primary-300) / <alpha-value>)',
+                400: 'rgb(var(--color-primary-400) / <alpha-value>)',
+                500: 'rgb(var(--color-primary-500) / <alpha-value>)',
+                600: 'rgb(var(--color-primary-600) / <alpha-value>)',
+                700: 'rgb(var(--color-primary-700) / <alpha-value>)',
+                800: 'rgb(var(--color-primary-800) / <alpha-value>)',
+                900: 'rgb(var(--color-primary-900) / <alpha-value>)',
+                950: 'rgb(var(--color-primary-950) / <alpha-value>)',
               }
             }
           }
@@ -35,15 +49,30 @@
     <style>
       body { 
         font-family: 'Inter', sans-serif; 
-        background-color: #fff7ed; 
+        background-color: rgb(var(--color-primary-50)); /* Dynamic background */
         overscroll-behavior-y: none;
         -webkit-tap-highlight-color: transparent;
         transition: background-color 0.3s ease;
       }
 
+      /* Default Theme (Orange) Fallback */
+      :root {
+        --color-primary-50: 255 247 237;
+        --color-primary-100: 255 237 213;
+        --color-primary-200: 254 215 170;
+        --color-primary-300: 253 186 116;
+        --color-primary-400: 251 146 60;
+        --color-primary-500: 249 115 22;
+        --color-primary-600: 234 88 12;
+        --color-primary-700: 194 65 12;
+        --color-primary-800: 154 52 18;
+        --color-primary-900: 124 45 18;
+        --color-primary-950: 67 20 7;
+      }
+
       /* Dark mode overrides */
       html.dark {
-        color-scheme: dark; /* Quan trọng: Báo cho trình duyệt render các control native (select, date picker) theo dark mode */
+        color-scheme: dark; 
       }
       
       html.dark body {
@@ -52,7 +81,6 @@
       }
 
       /* --- FIX: Date Picker Icon Visibility --- */
-      /* Light Mode: Force dark icon */
       input[type="date"]::-webkit-calendar-picker-indicator,
       input[type="time"]::-webkit-calendar-picker-indicator {
         filter: invert(0);
@@ -65,17 +93,15 @@
         opacity: 1;
       }
       
-      /* Dark Mode: Force white icon */
       html.dark input[type="date"]::-webkit-calendar-picker-indicator,
       html.dark input[type="time"]::-webkit-calendar-picker-indicator {
         filter: invert(1);
       }
-      /* ---------------------------------------- */
       
       ::-webkit-scrollbar { width: 4px; height: 4px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #fdba74; border-radius: 4px; }
-      ::-webkit-scrollbar-thumb:hover { background: #fb923c; }
+      ::-webkit-scrollbar-thumb { background: rgb(var(--color-primary-300)); border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgb(var(--color-primary-500)); }
 
       html.dark ::-webkit-scrollbar-thumb { background: #475569; }
       html.dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }
@@ -88,7 +114,6 @@
         scrollbar-width: none;
       }
       
-      /* Smooth transition for dark mode colors */
       *, *::before, *::after {
         transition-property: background-color, border-color, color, fill, stroke;
         transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -115,11 +140,9 @@
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
     
-    <!-- PWA Registration -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          // Sử dụng /sw.js tuyệt đối để đảm bảo scope root
           navigator.serviceWorker.register('/sw.js')
             .then(registration => {
               console.log('SW registered with scope:', registration.scope);

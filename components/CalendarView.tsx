@@ -33,6 +33,7 @@ interface CalendarViewProps {
   onToggleComplete: (task: Task) => void;
   onMoveTask: (taskId: string, newDate: string) => void; 
   onSelectDate?: (date: Date) => void;
+  onTagClick: (tagName: string) => void;
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({ 
@@ -44,7 +45,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   onEditTask, 
   onToggleComplete, 
   onMoveTask,
-  onSelectDate 
+  onSelectDate,
+  onTagClick
 }) => {
   // Determine range based on ViewMode
   let startDate: Date;
@@ -200,7 +202,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                    const isCompleted = task.completed;
                    const recType = task.recurringType || (task.isRecurring ? 'daily' : 'none');
                    const isRec = recType !== 'none';
-                   const tagConfig = tags.find(t => t.name === task.tag) || tags.find(t => t.name === 'Khác');
+                   
+                   // Use first tag for main color
+                   const mainTagName = task.tags && task.tags.length > 0 ? task.tags[0] : 'Khác';
+                   const tagConfig = tags.find(t => t.name === mainTagName) || tags.find(t => t.name === 'Khác');
                    
                    const taskStart = startOfDay(new Date(task.date));
                    const taskEnd = task.endDate ? startOfDay(new Date(task.endDate)) : taskStart;
@@ -284,6 +289,21 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                               <span className="text-[9px] font-semibold">{doneSub}/{totalSub}</span>
                            </div>
                          )}
+                         
+                         {/* Multi Tags Dots (Max 3) */}
+                         <div className="flex gap-0.5 ml-auto">
+                            {(task.tags || []).slice(0, 3).map((tagName, i) => {
+                                const tConf = tags.find(t => t.name === tagName);
+                                return (
+                                  <span 
+                                    key={i} 
+                                    className={`w-1.5 h-1.5 rounded-full ${tConf?.dot || 'bg-gray-400'} cursor-pointer hover:ring-1 hover:ring-gray-400`}
+                                    onClick={(e) => { e.stopPropagation(); onTagClick(tagName); }}
+                                    title={`Lọc: ${tagName}`}
+                                  ></span>
+                                )
+                            })}
+                         </div>
                       </div>
                       
                       {/* Hover Menu */}
@@ -303,7 +323,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({
               {viewMode === ViewMode.MONTH && (
                 <div className="flex sm:hidden flex-wrap justify-center gap-0.5 content-start mt-1 pointer-events-none">
                   {dayTasks.slice(0, 6).map(task => {
-                    const tagConfig = tags.find(t => t.name === task.tag) || tags.find(t => t.name === 'Khác');
+                    const mainTagName = task.tags && task.tags.length > 0 ? task.tags[0] : 'Khác';
+                    const tagConfig = tags.find(t => t.name === mainTagName) || tags.find(t => t.name === 'Khác');
                     return (
                       <div 
                           key={`${task.id}-${idx}-mobile`}

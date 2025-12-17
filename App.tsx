@@ -23,7 +23,8 @@ import {
   PieChart, 
   Layout,
   X,
-  Kanban
+  Kanban,
+  GanttChartSquare
 } from 'lucide-react';
 import CalendarView from './components/CalendarView';
 import StatsView from './components/StatsView';
@@ -38,11 +39,70 @@ import Sidebar from './components/Sidebar';
 import MobileNavigation from './components/MobileNavigation';
 import DashboardView from './components/DashboardView';
 import KanbanView from './components/KanbanView';
+import TimelineView from './components/TimelineView';
 
-import { Task, TelegramConfig, ViewMode, Tag, DEFAULT_TASK_TAGS, RecurringType } from './types';
+import { Task, TelegramConfig, ViewMode, Tag, DEFAULT_TASK_TAGS, RecurringType, AppTheme } from './types';
 import { parseTaskWithGemini, generateReport } from './services/geminiService';
 import { sendTelegramMessage, fetchTelegramUpdates, formatTaskForTelegram } from './services/telegramService';
 import { subscribeToTasks, subscribeToTags, saveTagsToFirestore, addTaskToFirestore, deleteTaskFromFirestore, updateTaskInFirestore, auth, logOut } from './services/firebase';
+
+// --- THEME DEFINITIONS ---
+export const APP_THEMES: AppTheme[] = [
+  {
+    name: 'orange',
+    label: 'Cam (Mặc định)',
+    colors: {
+        50: '255 247 237', 100: '255 237 213', 200: '254 215 170', 300: '253 186 116',
+        400: '251 146 60', 500: '249 115 22', 600: '234 88 12', 700: '194 65 12',
+        800: '154 52 18', 900: '124 45 18', 950: '67 20 7'
+    }
+  },
+  {
+    name: 'blue',
+    label: 'Xanh Dương',
+    colors: {
+        50: '239 246 255', 100: '219 234 254', 200: '191 219 254', 300: '147 197 253',
+        400: '96 165 250', 500: '59 130 246', 600: '37 99 235', 700: '29 78 216',
+        800: '30 64 175', 900: '30 58 138', 950: '23 37 84'
+    }
+  },
+  {
+    name: 'purple',
+    label: 'Tím Mộng Mơ',
+    colors: {
+        50: '250 245 255', 100: '243 232 255', 200: '233 213 255', 300: '216 180 254',
+        400: '192 132 252', 500: '168 85 247', 600: '147 51 234', 700: '126 34 206',
+        800: '107 33 168', 900: '88 28 135', 950: '59 7 100'
+    }
+  },
+  {
+    name: 'green',
+    label: 'Xanh Lá',
+    colors: {
+        50: '240 253 244', 100: '220 252 231', 200: '187 247 208', 300: '134 239 172',
+        400: '74 222 128', 500: '34 197 94', 600: '22 163 74', 700: '21 128 61',
+        800: '22 101 52', 900: '20 83 45', 950: '5 46 22'
+    }
+  },
+  {
+    name: 'rose',
+    label: 'Hồng Nữ Tính',
+    colors: {
+        50: '255 241 242', 100: '255 228 230', 200: '254 205 211', 300: '253 164 175',
+        400: '251 113 133', 500: '244 63 94', 600: '225 29 72', 700: '190 18 60',
+        800: '159 18 57', 900: '136 19 55', 950: '76 5 25'
+    }
+  },
+  {
+    name: 'teal',
+    label: 'Xanh Ngọc',
+    colors: {
+        50: '240 253 250', 100: '204 251 241', 200: '153 246 228', 300: '94 234 212',
+        400: '45 212 191', 500: '20 184 166', 600: '13 148 136', 700: '15 118 110',
+        800: '17 94 89', 900: '19 78 74', 950: '4 47 46'
+    }
+  }
+];
 
 const App: React.FC = () => {
   // Auth State
@@ -59,6 +119,14 @@ const App: React.FC = () => {
     return localStorage.getItem('theme') === 'dark';
   });
   
+  // Sidebar State (New)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Theme State
+  const [currentTheme, setCurrentTheme] = useState<string>(() => {
+    return localStorage.getItem('app_theme') || 'orange';
+  });
+
   // Tags Management State
   const [tags, setTags] = useState<Tag[]>(DEFAULT_TASK_TAGS);
   
@@ -109,36 +177,29 @@ const App: React.FC = () => {
     return saved ? parseInt(saved, 10) : 0;
   });
 
+  // --- Theme Injection ---
+  useEffect(() => {
+    const themeObj = APP_THEMES.find(t => t.name === currentTheme) || APP_THEMES[0];
+    const root = document.documentElement;
+    
+    // Set CSS Variables for Primary Color
+    Object.entries(themeObj.colors).forEach(([shade, rgb]) => {
+      root.style.setProperty(`--color-primary-${shade}`, rgb);
+    });
+
+    localStorage.setItem('app_theme', currentTheme);
+  }, [currentTheme]);
+
   // Capture PWA Install Prompt
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
-      // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
-      // Stash the event so it can be triggered later.
       setDeferredPrompt(e);
       console.log("PWA install prompt captured");
     };
-
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
-
-  const handleInstallPWA = () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then((choiceResult: any) => {
-        if (choiceResult.outcome === 'accepted') {
-          console.log('User accepted the install prompt');
-        } else {
-          console.log('User dismissed the install prompt');
-        }
-        setDeferredPrompt(null);
-      });
-    }
-  };
 
   // Auth Listener
   useEffect(() => {
@@ -147,7 +208,7 @@ const App: React.FC = () => {
       setIsAuthLoading(false);
       if (currentUser) {
         setIsOfflineMode(false);
-        setUseFirebase(true); // Re-enable firebase if logged in
+        setUseFirebase(true); 
       }
     });
     return () => unsubscribe();
@@ -175,9 +236,15 @@ const App: React.FC = () => {
   }, [isSearchActive]);
 
   // --- Filter Logic ---
-  
   const visibleTags = useMemo(() => {
-    const usedTagNames = new Set(tasks.map(t => t.tag || 'Khác'));
+    const usedTagNames = new Set<string>();
+    tasks.forEach(t => {
+      if (t.tags && t.tags.length > 0) {
+        t.tags.forEach(tag => usedTagNames.add(tag));
+      } else {
+        usedTagNames.add('Khác');
+      }
+    });
     return tags.filter(t => usedTagNames.has(t.name));
   }, [tasks, tags]);
 
@@ -185,7 +252,10 @@ const App: React.FC = () => {
     let result = tasks;
 
     if (selectedTagFilter) {
-      result = result.filter(t => (t.tag || 'Khác') === selectedTagFilter);
+      result = result.filter(t => {
+        const taskTags = (t.tags && t.tags.length > 0) ? t.tags : ['Khác'];
+        return taskTags.includes(selectedTagFilter);
+      });
     }
 
     if (searchQuery.trim()) {
@@ -325,7 +395,6 @@ const App: React.FC = () => {
   }, [lastTelegramUpdateId]);
 
   // --- Handlers (Memoized) ---
-
   const handleUpdateTask = useCallback(async (updatedTask: Task, showNotification: boolean = true) => {
     setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
 
@@ -470,7 +539,6 @@ const App: React.FC = () => {
   }, [tasks, telegramConfig, handleUpdateTask]);
 
   // --- Task Operations ---
-  
   const handleAddTask = async (newTask: Task, syncTelegram: boolean = true) => {
     const tempId = Date.now().toString();
     const taskWithTempId = { ...newTask, id: tempId };
@@ -488,7 +556,7 @@ const App: React.FC = () => {
           completed: newTask.completed,
           reminderSent: false,
           recurringType: newTask.recurringType || 'none',
-          tag: newTask.tag || 'Khác',
+          tags: newTask.tags || ['Khác'], // Ensure tags is array
           subtasks: newTask.subtasks || [],
           isRecurring: false,
           customStatus: 'todo' // Default for new tasks
@@ -569,7 +637,7 @@ const App: React.FC = () => {
       completed: false,
       reminderSent: false,
       recurringType: 'none',
-      tag: 'Khác',
+      tags: ['Khác'],
       subtasks: [],
       customStatus: 'todo'
     };
@@ -584,7 +652,6 @@ const App: React.FC = () => {
 
   const executeTelegramSync = async (isManual: boolean = false) => {
     if (!telegramConfig.botToken || (!user && !isOfflineMode)) return;
-    
     try {
       const offset = lastTelegramUpdateId ? lastTelegramUpdateId + 1 : 0;
       const updates = await fetchTelegramUpdates(telegramConfig, offset);
@@ -611,7 +678,7 @@ const App: React.FC = () => {
               completed: false,
               reminderSent: false,
               recurringType: (result.recurringType as RecurringType) || 'none',
-              tag: result.tag || 'Khác',
+              tags: result.tags || ['Khác'],
               subtasks: [],
               customStatus: 'todo'
             }, false);
@@ -687,6 +754,7 @@ const App: React.FC = () => {
             onToggleComplete={handleToggleComplete}
             onOpenEditModal={openEditModal}
             onDeleteTask={handleDeleteTask}
+            onTagClick={setSelectedTagFilter}
           />
         );
     }
@@ -699,8 +767,21 @@ const App: React.FC = () => {
              onToggleComplete={handleToggleComplete}
              onOpenEditModal={openEditModal}
              onUpdateStatus={handleUpdateStatusKanban}
+             onTagClick={setSelectedTagFilter}
           />
        )
+    }
+
+    if (viewMode === ViewMode.TIMELINE) {
+      return (
+        <TimelineView 
+          currentDate={currentDate}
+          tasks={filteredTasks}
+          tags={tags}
+          onOpenEditModal={openEditModal}
+          onTagClick={setSelectedTagFilter}
+        />
+      );
     }
 
     return (
@@ -714,26 +795,25 @@ const App: React.FC = () => {
         onToggleComplete={handleToggleComplete}
         onMoveTask={handleMoveTask}
         onSelectDate={handleDaySelect}
+        onTagClick={setSelectedTagFilter}
       />
     );
   };
 
-  // If loading auth state
   if (isAuthLoading) {
      return (
-        <div className="flex h-screen items-center justify-center bg-[#fff7ed] dark:bg-gray-950 text-orange-600">
+        <div className="flex h-screen items-center justify-center bg-primary-50 dark:bg-gray-950 text-primary-600">
            <RefreshCw className="animate-spin" size={32} />
         </div>
      );
   }
 
-  // If not logged in AND not in offline mode
   if (!user && !isOfflineMode) {
      return <LoginScreen onBypassAuth={() => { setIsOfflineMode(true); setUseFirebase(false); }} />;
   }
 
   return (
-    <div className="flex flex-col h-screen supports-[height:100dvh]:h-[100dvh] text-gray-800 dark:text-gray-100 bg-[#fff7ed] dark:bg-gray-950 overflow-hidden transition-colors duration-300">
+    <div className="flex flex-col h-screen supports-[height:100dvh]:h-[100dvh] text-gray-800 dark:text-gray-100 bg-primary-50 dark:bg-gray-950 overflow-hidden transition-colors duration-300">
       <Toast toasts={toasts} onRemove={removeToast} />
 
       {!useFirebase ? (
@@ -751,14 +831,13 @@ const App: React.FC = () => {
             </button>
           )}
           {isOfflineMode && (
-             <button onClick={() => window.location.reload()} className="text-orange-600 dark:text-orange-400 hover:underline">
+             <button onClick={() => window.location.reload()} className="text-primary-600 dark:text-primary-400 hover:underline">
                Đăng nhập
              </button>
           )}
         </div>
       ) : null}
 
-      {/* Replaced Monolithic Header with Component */}
       <Header 
         currentDate={currentDate}
         setCurrentDate={setCurrentDate}
@@ -779,48 +858,56 @@ const App: React.FC = () => {
         onLogout={() => { if(isOfflineMode) window.location.reload(); else logOut(); }}
         datePickerRef={datePickerRef}
         searchInputRef={searchInputRef}
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
       />
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
-        {/* Main Content Area */}
         <div className="flex-1 p-2 lg:p-3 flex flex-col min-w-0 order-1 lg:order-1 h-full overflow-hidden">
-          {/* Desktop View Switcher & Filter */}
+          {/* Desktop View Switcher */}
           <div className="hidden lg:flex flex-row items-center justify-between mb-3 px-1 flex-shrink-0 gap-2">
-             <div className="flex gap-1 bg-orange-100 dark:bg-gray-800 p-1 rounded-lg shadow-sm">
+             <div className="flex gap-1 bg-primary-100 dark:bg-gray-800 p-1 rounded-lg shadow-sm overflow-x-auto no-scrollbar">
                 <button 
                   onClick={() => setViewMode(ViewMode.MONTH)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all ${viewMode === ViewMode.MONTH ? 'bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 shadow-sm' : 'text-orange-900/60 dark:text-gray-200 hover:text-orange-900 dark:hover:text-white'}`}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap ${viewMode === ViewMode.MONTH ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-primary-900/60 dark:text-gray-200 hover:text-primary-900 dark:hover:text-white'}`}
                 >
                   <LayoutGrid size={14} /> Tháng
                 </button>
                 <button 
                   onClick={() => setViewMode(ViewMode.WEEK)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all ${viewMode === ViewMode.WEEK ? 'bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 shadow-sm' : 'text-orange-900/60 dark:text-gray-200 hover:text-orange-900 dark:hover:text-white'}`}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap ${viewMode === ViewMode.WEEK ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-primary-900/60 dark:text-gray-200 hover:text-primary-900 dark:hover:text-white'}`}
                 >
                   <Columns size={14} /> Tuần
                 </button>
                  <button 
                   onClick={() => setViewMode(ViewMode.DAY)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all ${viewMode === ViewMode.DAY ? 'bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 shadow-sm' : 'text-orange-900/60 dark:text-gray-200 hover:text-orange-900 dark:hover:text-white'}`}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap ${viewMode === ViewMode.DAY ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-primary-900/60 dark:text-gray-200 hover:text-primary-900 dark:hover:text-white'}`}
                 >
                   <Square size={14} /> Ngày
                 </button>
-                <div className="w-[1px] bg-orange-200 dark:bg-gray-700 mx-1"></div>
+                <div className="w-[1px] bg-primary-200 dark:bg-gray-700 mx-1"></div>
                 <button 
                   onClick={() => setViewMode(ViewMode.LIST)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all ${viewMode === ViewMode.LIST ? 'bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 shadow-sm' : 'text-orange-900/60 dark:text-gray-200 hover:text-orange-900 dark:hover:text-white'}`}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap ${viewMode === ViewMode.LIST ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-primary-900/60 dark:text-gray-200 hover:text-primary-900 dark:hover:text-white'}`}
                 >
                    <Layout size={14} /> Dashboard
                 </button>
                 <button 
                   onClick={() => setViewMode(ViewMode.KANBAN)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all ${viewMode === ViewMode.KANBAN ? 'bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 shadow-sm' : 'text-orange-900/60 dark:text-gray-200 hover:text-orange-900 dark:hover:text-white'}`}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap ${viewMode === ViewMode.KANBAN ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-primary-900/60 dark:text-gray-200 hover:text-primary-900 dark:hover:text-white'}`}
                 >
                    <Kanban size={14} /> Kanban
                 </button>
                 <button 
+                  onClick={() => setViewMode(ViewMode.TIMELINE)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap ${viewMode === ViewMode.TIMELINE ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-primary-900/60 dark:text-gray-200 hover:text-primary-900 dark:hover:text-white'}`}
+                >
+                   <GanttChartSquare size={14} /> Timeline
+                </button>
+                <div className="w-[1px] bg-primary-200 dark:bg-gray-700 mx-1"></div>
+                <button 
                   onClick={() => setViewMode(ViewMode.STATS)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all ${viewMode === ViewMode.STATS ? 'bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 shadow-sm' : 'text-orange-900/60 dark:text-gray-200 hover:text-orange-900 dark:hover:text-white'}`}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap ${viewMode === ViewMode.STATS ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-primary-900/60 dark:text-gray-200 hover:text-primary-900 dark:hover:text-white'}`}
                 >
                    <PieChart size={14} /> Thống kê
                 </button>
@@ -854,9 +941,9 @@ const App: React.FC = () => {
           {/* Mobile Filter Status */}
           <div className="lg:hidden px-1 mb-1">
              {searchQuery && (
-                 <div className="flex items-center justify-between bg-orange-100 dark:bg-gray-800 px-3 py-1.5 rounded-md text-xs">
-                    <span className="text-orange-800 dark:text-orange-200">Tìm: <b>{searchQuery}</b></span>
-                    <button onClick={() => setSearchQuery("")} className="text-orange-600 dark:text-orange-400"><X size={14}/></button>
+                 <div className="flex items-center justify-between bg-primary-100 dark:bg-gray-800 px-3 py-1.5 rounded-md text-xs">
+                    <span className="text-primary-800 dark:text-primary-200">Tìm: <b>{searchQuery}</b></span>
+                    <button onClick={() => setSearchQuery("")} className="text-primary-600 dark:text-primary-400"><X size={14}/></button>
                  </div>
              )}
           </div>
@@ -866,20 +953,24 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Replaced Monolithic Sidebar with Component */}
-        <Sidebar 
-          onAddTask={handleAddTask}
-          onGenerateReport={handleGenerateReport}
-          isReportLoading={isReportLoading}
-          aiReport={aiReport}
-          tags={tags}
-          user={user}
-          isOfflineMode={isOfflineMode}
-          isDarkMode={isDarkMode}
-          showToast={showToast}
-        />
+        {/* Sidebar with Transition Wrapper */}
+        <div className={`
+          hidden lg:flex flex-col border-l border-primary-200 dark:border-gray-800 shadow-xl z-20 h-full order-2 transition-all duration-300 ease-in-out
+          ${isSidebarOpen ? 'w-[320px] translate-x-0' : 'w-0 translate-x-full opacity-0 overflow-hidden'}
+        `}>
+          <Sidebar 
+            onAddTask={handleAddTask}
+            onGenerateReport={handleGenerateReport}
+            isReportLoading={isReportLoading}
+            aiReport={aiReport}
+            tags={tags}
+            user={user}
+            isOfflineMode={isOfflineMode}
+            isDarkMode={isDarkMode}
+            showToast={showToast}
+          />
+        </div>
 
-        {/* Replaced Mobile Nav with Component */}
         <MobileNavigation 
           viewMode={viewMode}
           setViewMode={setViewMode}
@@ -901,6 +992,9 @@ const App: React.FC = () => {
         isSyncing={false}
         lastSyncTime={format(new Date(), 'HH:mm')}
         showToast={showToast}
+        currentTheme={currentTheme}
+        setCurrentTheme={setCurrentTheme}
+        themes={APP_THEMES}
       />
       <EditTaskModal 
         isOpen={isEditModalOpen} 

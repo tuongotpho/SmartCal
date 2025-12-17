@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { TelegramConfig, Tag, COLOR_PALETTES } from '../types';
-import { X, Save, Key, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Sparkles } from 'lucide-react';
+import { TelegramConfig, Tag, COLOR_PALETTES, AppTheme } from '../types';
+import { X, Save, Key, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Sparkles, Palette } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 import { ToastType } from './Toast';
 
@@ -16,6 +16,11 @@ interface SettingsModalProps {
   isSyncing: boolean;
   lastSyncTime: string;
   showToast: (message: string, type: ToastType) => void;
+  
+  // Theme Props
+  currentTheme?: string;
+  setCurrentTheme?: (theme: string) => void;
+  themes?: AppTheme[];
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
@@ -28,7 +33,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onManualSync,
   isSyncing,
   lastSyncTime,
-  showToast
+  showToast,
+  currentTheme,
+  setCurrentTheme,
+  themes = []
 }) => {
   const [config, setConfig] = useState<TelegramConfig>(telegramConfig);
   const [currentTags, setCurrentTags] = useState<Tag[]>(tags);
@@ -94,19 +102,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  // Helper để hiển thị masked key
-  const formatKeyDisplay = (key: string) => {
-    if (!key) return '';
-    if (key.length < 8) return '********';
-    return key.substring(0, 4) + '...' + key.substring(key.length - 4);
-  };
-
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-orange-950/30 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] border border-orange-100 dark:border-gray-700">
-        <div className="bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-4 flex justify-between items-center flex-shrink-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary-950/30 backdrop-blur-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] border border-primary-100 dark:border-gray-700">
+        <div className="bg-gradient-to-r from-primary-500 to-primary-700 text-white px-6 py-4 flex justify-between items-center flex-shrink-0">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <Key size={20} /> Cài đặt Hệ thống
           </h2>
@@ -117,13 +118,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
           <button 
             onClick={() => setActiveTab('general')}
-            className={`flex-1 py-3 text-sm font-semibold transition-colors ${activeTab === 'general' ? 'text-orange-600 dark:text-orange-400 border-b-2 border-orange-600 dark:border-orange-400 bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+            className={`flex-1 py-3 text-sm font-semibold transition-colors ${activeTab === 'general' ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400 bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
           >
             Cấu hình chung
           </button>
           <button 
              onClick={() => setActiveTab('tags')}
-             className={`flex-1 py-3 text-sm font-semibold transition-colors ${activeTab === 'tags' ? 'text-orange-600 dark:text-orange-400 border-b-2 border-orange-600 dark:border-orange-400 bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+             className={`flex-1 py-3 text-sm font-semibold transition-colors ${activeTab === 'tags' ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400 bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
           >
             Quản lý Thẻ (Tags)
           </button>
@@ -132,10 +133,32 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
           {activeTab === 'general' ? (
             <div className="space-y-6">
+              
+              {/* Theme Selection */}
+              {themes && setCurrentTheme && (
+                 <div className="space-y-3">
+                   <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
+                    <Palette size={16} className="text-primary-500" /> Giao diện & Màu sắc
+                   </h3>
+                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                      {themes.map(t => (
+                        <button
+                          key={t.name}
+                          onClick={() => setCurrentTheme(t.name)}
+                          className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition ${currentTheme === t.name ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                        >
+                           <div className="w-6 h-6 rounded-full border border-gray-200 shadow-sm" style={{ backgroundColor: `rgb(${t.colors[500]})` }}></div>
+                           <span className="text-[10px] text-gray-600 dark:text-gray-300 truncate w-full text-center">{t.label}</span>
+                        </button>
+                      ))}
+                   </div>
+                 </div>
+              )}
+
               {/* Gemini Config */}
               <div className="space-y-3">
                  <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
-                  <Sparkles size={16} className="text-orange-500" /> Cấu hình Gemini AI
+                  <Sparkles size={16} className="text-primary-500" /> Cấu hình Gemini AI
                 </h3>
                 
                 <div>
@@ -146,11 +169,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={geminiKey}
                       onChange={(e) => setGeminiKey(e.target.value)}
                       placeholder="Nhập API Key để kích hoạt AI"
-                      className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none pr-10"
+                      className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none pr-10"
                     />
                   </div>
                   <p className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">
-                    Key được lưu trên trình duyệt của bạn (LocalStorage). Lấy key tại <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-orange-600 dark:text-orange-400 underline">aistudio.google.com</a>
+                    Key được lưu trên trình duyệt của bạn (LocalStorage). Lấy key tại <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary-600 dark:text-primary-400 underline">aistudio.google.com</a>
                   </p>
                 </div>
               </div>
@@ -168,9 +191,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={config.botToken}
                       onChange={(e) => setConfig({ ...config, botToken: e.target.value })}
                       placeholder="123456789:ABCdef..."
-                      className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                      className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
                     />
-                    <p className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">Lấy từ @BotFather trên Telegram.</p>
                   </div>
 
                   <div>
@@ -180,16 +202,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={config.chatId}
                       onChange={(e) => setConfig({ ...config, chatId: e.target.value })}
                       placeholder="-987654321 hoặc ID cá nhân"
-                      className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                      className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
                     />
-                    <p className="text-[10px] text-gray-500 dark:text-gray-500 mt-1">ID của nhóm hoặc cá nhân nhận thông báo.</p>
                   </div>
                 </div>
 
                 {/* Manual Sync Button inside Settings */}
-                <div className="bg-orange-50 dark:bg-orange-900/10 p-3 rounded-lg border border-orange-100 dark:border-orange-900/30 mt-2">
+                <div className="bg-primary-50 dark:bg-primary-900/10 p-3 rounded-lg border border-primary-100 dark:border-primary-900/30 mt-2">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-semibold text-orange-800 dark:text-orange-300">Đồng bộ thủ công</span>
+                    <span className="text-xs font-semibold text-primary-800 dark:text-primary-300">Đồng bộ thủ công</span>
                     {lastSyncTime && (
                       <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-1">
                         <Clock size={10} /> {lastSyncTime}
@@ -202,22 +223,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     className={`w-full py-2 rounded-lg text-xs font-bold transition shadow-sm flex items-center justify-center gap-2
                       ${isSyncing || !config.botToken 
                         ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
-                        : 'bg-white dark:bg-gray-800 border border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/30'}
+                        : 'bg-white dark:bg-gray-800 border border-primary-300 dark:border-primary-700 text-primary-700 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/30'}
                     `}
                   >
                     {isSyncing ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                     {config.botToken ? "Quét tin nhắn Telegram ngay" : "Vui lòng nhập Token trước"}
                   </button>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-500 mt-2 text-center">
-                    Hệ thống tự động quét tin nhắn mỗi phút.
-                  </p>
                 </div>
               </div>
             </div>
           ) : (
             <div className="space-y-4 h-full flex flex-col">
               <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 pb-2">
-                <TagIcon size={16} className="text-orange-500" /> Danh sách Thẻ phân loại
+                <TagIcon size={16} className="text-primary-500" /> Danh sách Thẻ phân loại
               </h3>
               
               {/* Add New Tag */}
@@ -229,16 +247,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     value={newTagName}
                     onChange={(e) => setNewTagName(e.target.value)}
                     placeholder="VD: Dự án A" 
-                    className="w-full text-sm p-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    className="w-full text-sm p-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                   />
                 </div>
                 
-                {/* Custom Color Dropdown để tránh nền đen */}
+                {/* Custom Color Dropdown */}
                 <div className="w-1/3 relative" ref={dropdownRef}>
                   <label className="text-xs text-gray-500 dark:text-gray-300 mb-1 block">Màu sắc</label>
                   <button
                     onClick={() => setIsColorDropdownOpen(!isColorDropdownOpen)}
-                    className="w-full text-sm p-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white flex items-center justify-between"
+                    className="w-full text-sm p-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white flex items-center justify-between"
                   >
                     <div className="flex items-center gap-2 overflow-hidden">
                        <div className={`w-3 h-3 rounded-full ${COLOR_PALETTES[newTagColorKey]?.dot}`}></div>
@@ -256,7 +274,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             setNewTagColorKey(key);
                             setIsColorDropdownOpen(false);
                           }}
-                          className="flex items-center gap-2 p-2 hover:bg-orange-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-700 dark:text-gray-200"
+                          className="flex items-center gap-2 p-2 hover:bg-primary-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-700 dark:text-gray-200"
                         >
                            <div className={`w-3 h-3 rounded-full ${COLOR_PALETTES[key].dot}`}></div>
                            <span>{COLOR_PALETTES[key].label}</span>
@@ -268,7 +286,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <button 
                   onClick={handleAddTag}
-                  className="bg-orange-500 hover:bg-orange-600 text-white p-2 rounded transition"
+                  className="bg-primary-500 hover:bg-primary-600 text-white p-2 rounded transition"
                 >
                   <Plus size={20} />
                 </button>
@@ -282,7 +300,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       <span className={`w-4 h-4 rounded-full ${tag.dot} shadow-sm border border-white dark:border-gray-600`}></span>
                       <span className="font-semibold text-sm text-gray-700 dark:text-gray-200">{tag.name}</span>
                     </div>
-                    {/* Don't allow deleting 'Khác' to prevent errors */}
                     {tag.name !== 'Khác' && (
                       <button 
                         onClick={() => handleDeleteTagRequest(tag.name)}
@@ -293,7 +310,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     )}
                   </div>
                 ))}
-                {currentTags.length === 0 && <p className="text-center text-gray-400 text-sm py-4">Chưa có thẻ nào.</p>}
               </div>
             </div>
           )}
@@ -304,7 +320,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             onClick={() => {
               onSaveConfig(config);
               onSaveTags(currentTags);
-              // Lưu Gemini Key
               if (geminiKey) {
                 localStorage.setItem('gemini_api_key', geminiKey);
                 showToast("Đã lưu cấu hình & API Key!", "success");
@@ -314,7 +329,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               }
               onClose();
             }}
-            className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition shadow-md text-sm font-medium"
+            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition shadow-md text-sm font-medium"
           >
             <Save size={16} /> Lưu cấu hình
           </button>
