@@ -250,17 +250,27 @@ export const updateTaskInFirestore = async (task: Task) => {
   try {
     const taskRef = db.collection(COLLECTION_NAME).doc(task.id);
     
-    // Loại bỏ các trường không cần thiết hoặc gây lỗi
-    const { id, isRecurring, userId, ...dataToUpdate } = task; 
-    
-    await taskRef.update({
-        ...dataToUpdate,
-        endDate: task.endDate || task.date,
-        recurringType: task.recurringType || 'none',
-        duration: task.duration || "",
-        tags: task.tags || ['Khác'], // Ensure tags is array
-        subtasks: task.subtasks || []
-    });
+    // Tạo payload sạch, đảm bảo không có trường nào là undefined
+    // Firestore sẽ ném lỗi nếu gửi undefined
+    const payload: Record<string, any> = {
+      title: task.title || "",
+      date: task.date,
+      endDate: task.endDate || task.date,
+      time: task.time || "00:00",
+      duration: task.duration || "",
+      description: task.description || "", // Quan trọng: fallback chuỗi rỗng
+      completed: !!task.completed,
+      reminderSent: !!task.reminderSent,
+      recurringType: task.recurringType || 'none',
+      tags: (task.tags && task.tags.length > 0) ? task.tags : ['Khác'],
+      subtasks: task.subtasks || [],
+      customStatus: task.customStatus || 'todo'
+    };
+
+    // Nếu có color (optional), thêm vào
+    if (task.color) payload.color = task.color;
+
+    await taskRef.update(payload);
     return true;
   } catch (e: any) {
     console.warn("Lỗi khi cập nhật Firestore:", e.message);

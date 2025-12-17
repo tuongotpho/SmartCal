@@ -31,9 +31,12 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
     if (task) {
       setFormData({
          ...task,
+         title: task.title || '',
+         description: task.description || '', // Ensure no undefined
+         duration: task.duration || '',
          endDate: task.endDate || task.date,
          recurringType: task.recurringType || (task.isRecurring ? 'daily' : 'none'),
-         tags: task.tags || ['Khác'], // Default to array
+         tags: (task.tags && task.tags.length > 0) ? task.tags : ['Khác'], 
          subtasks: task.subtasks || []
       });
     }
@@ -48,8 +51,6 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
     } else {
         newTags = [...currentTags, tagName];
     }
-    // Ensure at least one tag or empty array? Let's allow empty and default to 'Khác' on save if needed, 
-    // but better to allow multiple.
     setFormData({ ...formData, tags: newTags });
   };
 
