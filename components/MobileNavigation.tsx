@@ -6,7 +6,8 @@ import {
   Plus, 
   PieChart, 
   Settings,
-  GanttChartSquare
+  GanttChartSquare,
+  Timer
 } from 'lucide-react';
 import { ViewMode } from '../types';
 
@@ -32,26 +33,22 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
           <span className="text-[9px] font-medium">Dashboard</span>
         </button>
 
-        {/* 2. Timeline (Replaced Calendar on Mobile for easier access, or keep Calendar) 
-            Let's keep Calendar but maybe swap Stats or add logic. 
-            For now, stick to original icons but add Timeline logic? 
-            Actually user might want Timeline on mobile. Let's use Gantt Icon for Timeline if selected, else Calendar.
-        */}
+        {/* 2. Calendar/Timeline */}
         <button 
            onClick={() => setViewMode(ViewMode.MONTH)} 
            className={`flex flex-col items-center justify-center gap-0.5 h-full active:scale-95 transition-all ${viewMode === ViewMode.MONTH || viewMode === ViewMode.TIMELINE ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
         >
-          {viewMode === ViewMode.TIMELINE ? <GanttChartSquare size={22} strokeWidth={2.5}/> : <LayoutGrid size={22} strokeWidth={viewMode === ViewMode.MONTH ? 2.5 : 2} />}
-          <span className="text-[9px] font-medium">{viewMode === ViewMode.TIMELINE ? 'Timeline' : 'Lịch'}</span>
+          <LayoutGrid size={22} strokeWidth={viewMode === ViewMode.MONTH ? 2.5 : 2} />
+          <span className="text-[9px] font-medium">Lịch</span>
         </button>
         
-        {/* 3. Center FAB (Floating Action Button) */}
+        {/* 3. Focus FAB */}
         <div className="relative flex justify-center items-center h-full pointer-events-none">
           <button 
-             onClick={onCreateNewTask}
-             className="pointer-events-auto absolute -top-6 bg-gradient-to-tr from-primary-500 to-primary-700 text-white p-3.5 rounded-full shadow-xl shadow-primary-500/30 border-4 border-[#fff7ed] dark:border-gray-950 active:scale-90 transition-all hover:scale-105"
+             onClick={() => setViewMode(ViewMode.FOCUS)}
+             className={`pointer-events-auto absolute -top-6 bg-gradient-to-tr text-white p-3.5 rounded-full shadow-xl border-4 border-[#fff7ed] dark:border-gray-950 active:scale-90 transition-all hover:scale-105 ${viewMode === ViewMode.FOCUS ? 'from-orange-500 to-red-600 shadow-orange-500/30' : 'from-primary-500 to-primary-700 shadow-primary-500/30'}`}
           >
-             <Plus size={28} />
+             <Timer size={28} />
           </button>
         </div>
 
@@ -61,10 +58,10 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
           <span className="text-[9px] font-medium">Thống kê</span>
         </button>
 
-        {/* 5. Settings */}
-        <button onClick={onOpenSettings} className={`flex flex-col items-center justify-center gap-0.5 h-full active:scale-95 transition-all text-gray-400 hover:text-gray-600 dark:hover:text-gray-300`}>
-          <Settings size={22} />
-          <span className="text-[9px] font-medium">Cài đặt</span>
+        {/* 5. Create New */}
+        <button onClick={onCreateNewTask} className={`flex flex-col items-center justify-center gap-0.5 h-full active:scale-95 transition-all text-gray-400 hover:text-gray-600 dark:hover:text-gray-300`}>
+          <Plus size={22} />
+          <span className="text-[9px] font-medium">Thêm mới</span>
         </button>
       </div>
     </div>

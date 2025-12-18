@@ -117,14 +117,13 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  // --- Parser Logic (Fallback Manual) ---
+  // --- Parser Logic ---
   const parseManualInput = (input: string): { title: string; date: string; time: string } => {
     let text = input;
     const now = new Date();
     let targetDate = now;
     let targetTime = format(now, "HH:mm");
 
-    // Time Regex
     const timeRegex = /(?:lúc\s+)?(\d{1,2})[:h](\d{2})?(?:\s*(?:sáng|chiều|tối))?/i;
     const timeMatch = text.match(timeRegex);
 
@@ -143,7 +142,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         targetTime = "08:00";
     }
 
-    // Date Regex/Keywords
     const lowerText = text.toLowerCase();
     let dateFound = false;
 
@@ -187,28 +185,22 @@ const Sidebar: React.FC<SidebarProps> = ({
     };
   };
 
-  // --- Handlers ---
   const handleQuickAdd = async () => {
     if (!quickInput.trim()) return;
     setIsProcessingAI(true);
 
     try {
-        const apiKey = localStorage.getItem('gemini_api_key');
-        let taskData: { title: string; date: string; time: string; duration?: string; description?: string; tags?: string[] } | null = null;
-        let method = 'manual';
-
+        let taskData: { title: string; date: string; time: string; duration?: string; description?: string; tags?: string[]; recurringType?: string } | null = null;
+        
         // 1. AI Parsing
-        if (apiKey) {
-            try {
-                const availableTags = tags.map(t => t.name);
-                const aiResult = await parseTaskWithGemini(quickInput, availableTags);
-                if (aiResult) {
-                    taskData = aiResult;
-                    method = 'ai';
-                }
-            } catch (error) {
-                console.warn("AI failed, falling back to manual parser", error);
+        try {
+            const availableTags = tags.map(t => t.name);
+            const aiResult = await parseTaskWithGemini(quickInput, availableTags);
+            if (aiResult) {
+                taskData = aiResult;
             }
+        } catch (error) {
+            console.warn("AI failed, falling back to manual parser", error);
         }
 
         // 2. Manual Parsing Fallback
@@ -216,10 +208,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             const manualResult = parseManualInput(quickInput);
             taskData = {
                 ...manualResult,
-                description: "Tạo nhanh (Không dùng AI)",
+                description: "Tạo nhanh",
                 tags: ['Khác']
             };
-            method = 'manual';
         }
 
         if (taskData) {
@@ -230,19 +221,16 @@ const Sidebar: React.FC<SidebarProps> = ({
                 date: taskData.date,
                 time: taskData.time,
                 duration: taskData.duration || "",
-                description: taskData.description || (method === 'ai' ? "Tạo tự động bởi AI" : "Tạo nhanh"),
+                description: taskData.description || "Tạo nhanh qua AI Assistant",
                 completed: false,
                 reminderSent: false,
-                recurringType: (taskData as any).recurringType || 'none',
+                recurringType: (taskData.recurringType as RecurringType) || 'none',
                 tags: taskData.tags || ['Khác'],
                 subtasks: []
               };
+              // onAddTask now includes the check logic in App.tsx
               await onAddTask(newTask);
               setQuickInput("");
-              
-              if (method === 'manual' && apiKey) {
-                  showToast("Đã tạo việc (AI gặp lỗi nên dùng chế độ thường)", "info");
-              }
         }
     } catch (e) {
         showToast("Lỗi không xác định khi tạo công việc.", "error");
@@ -256,10 +244,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       showToast("Vui lòng nhập tiêu đề công việc", "warning");
       return;
     }
-    if (!manualForm.date) {
-      showToast("Vui lòng chọn ngày", "warning");
-      return;
-    }
+    setIsProcessingAI(true); // Reuse state for loading
 
     let subtasks: Subtask[] = [];
     if (manualForm.checklistText.trim()) {
@@ -289,15 +274,18 @@ const Sidebar: React.FC<SidebarProps> = ({
       subtasks: subtasks
     };
 
-    await onAddTask(newTask);
-    
-    setManualForm({ 
-        ...manualForm, 
-        title: '', 
-        description: '', 
-        checklistText: '',
-        duration: ''
-    }); 
+    try {
+      await onAddTask(newTask);
+      setManualForm({ 
+          ...manualForm, 
+          title: '', 
+          description: '', 
+          checklistText: '',
+          duration: ''
+      }); 
+    } finally {
+      setIsProcessingAI(false);
+    }
   };
 
   return (
@@ -308,7 +296,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             <CalendarPlus size={16} className="text-primary-500" /> Thêm công việc mới
           </h2>
           
-          {/* Tabs Switcher */}
           <div className="flex gap-1 mb-3 bg-white dark:bg-gray-700 p-1 rounded-lg border border-primary-100 dark:border-gray-600 shadow-sm">
               <button 
                 onClick={() => setSidebarTab('manual')}
@@ -332,14 +319,12 @@ const Sidebar: React.FC<SidebarProps> = ({
               </button>
           </div>
 
-          {/* Tab Content */}
           {sidebarTab === 'ai' ? (
-            /* AI Input Mode */
             <div className="relative animate-in fade-in zoom-in-95 duration-200">
               <textarea
                 value={quickInput}
                 onChange={(e) => setQuickInput(e.target.value)}
-                placeholder="VD: Họp 9h sáng mai... (Hỗ trợ giọng nói)"
+                placeholder="VD: Họp 9h sáng mai... (AI sẽ kiểm tra xung đột lịch cho bạn)"
                 style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
                 className="w-full border border-primary-200 dark:border-gray-600 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none min-h-[120px] resize-none shadow-inner bg-white dark:bg-gray-700 dark:text-white"
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleQuickAdd(); } }}
@@ -350,13 +335,10 @@ const Sidebar: React.FC<SidebarProps> = ({
               <button onClick={handleQuickAdd} disabled={isProcessingAI || !quickInput.trim()} className={`absolute bottom-2 right-2 p-1.5 rounded-md transition-all shadow-sm ${isProcessingAI ? 'bg-gray-200 dark:bg-gray-600' : 'bg-primary-600 text-white'}`}>
                 {isProcessingAI ? <RefreshCw size={14} className="animate-spin" /> : <ChevronRight size={14} />}
               </button>
-              <p className="text-[10px] text-gray-400 mt-2 italic text-center">
-                * AI tự động nhận diện ngày giờ từ văn bản.
-              </p>
+              {isProcessingAI && <div className="absolute inset-0 bg-white/50 dark:bg-gray-900/50 flex items-center justify-center rounded-lg z-10"><RefreshCw className="animate-spin text-primary-600" size={24} /></div>}
             </div>
           ) : (
-            /* Manual Input Mode */
-            <div className="space-y-2.5 animate-in fade-in zoom-in-95 duration-200 max-h-[calc(100vh-320px)] overflow-y-auto custom-scrollbar pr-1">
+            <div className="space-y-2.5 animate-in fade-in zoom-in-95 duration-200 max-h-[calc(100vh-320px)] overflow-y-auto custom-scrollbar pr-1 relative">
                <div>
                  <input 
                     type="text"
@@ -367,7 +349,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                  />
                </div>
                
-               {/* Date & Time Row */}
                <div className="grid grid-cols-2 gap-2">
                    <div>
                        <label className="text-[10px] font-bold text-gray-500 uppercase">Ngày bắt đầu</label>
@@ -390,7 +371,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                    </div>
                </div>
 
-               {/* Time & Tag */}
                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-[10px] font-bold text-gray-500 uppercase">Giờ</label>
@@ -415,7 +395,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                </div>
 
-               {/* Recurring */}
                <div>
                     <label className="text-[10px] font-bold text-gray-500 uppercase">Lặp lại</label>
                     <select
@@ -431,7 +410,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </select>
                </div>
                
-               {/* Description */}
                <div>
                    <textarea
                         rows={2}
@@ -442,28 +420,18 @@ const Sidebar: React.FC<SidebarProps> = ({
                     />
                </div>
 
-                {/* Checklist (Simplified) */}
-               <div>
-                   <textarea
-                        rows={2}
-                        value={manualForm.checklistText}
-                        onChange={(e) => setManualForm({ ...manualForm, checklistText: e.target.value })}
-                        placeholder="Checklist (mỗi dòng 1 việc)..."
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary-500 outline-none resize-none bg-white dark:bg-gray-700 dark:text-white border-dashed"
-                    />
-               </div>
-
                <button 
                 onClick={handleManualSubmit}
-                className="w-full bg-primary-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-primary-700 transition flex items-center justify-center gap-2 shadow-sm active:scale-95"
+                disabled={isProcessingAI}
+                className="w-full bg-primary-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-primary-700 transition flex items-center justify-center gap-2 shadow-sm active:scale-95 disabled:opacity-50"
                >
-                 <Plus size={14} /> Tạo công việc
+                 {isProcessingAI ? <RefreshCw size={14} className="animate-spin" /> : <Plus size={14} />} Tạo công việc
                </button>
+               {isProcessingAI && <div className="absolute inset-0 bg-white/30 dark:bg-gray-900/30 flex items-center justify-center rounded-lg z-10"></div>}
             </div>
           )}
        </div>
 
-       {/* Button Bar */}
        <div className="p-4 border-b border-primary-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex-shrink-0">
          <button 
            onClick={onGenerateReport}
@@ -475,7 +443,6 @@ const Sidebar: React.FC<SidebarProps> = ({
          </button>
        </div>
 
-       {/* Scrollable Content */}
        <div className="flex-1 p-4 overflow-y-auto space-y-6">
           {aiReport && (
              <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-lg border border-indigo-100 dark:border-indigo-800 text-gray-700 dark:text-gray-300 animate-in fade-in slide-in-from-top-2 shadow-sm">
@@ -491,7 +458,7 @@ const Sidebar: React.FC<SidebarProps> = ({
        </div>
        
        <div className="p-2 border-t border-primary-100 dark:border-gray-800 text-[10px] text-center text-gray-400 bg-primary-50 dark:bg-gray-800 flex-shrink-0">
-         v2.7.0 • SmartCal Pro • AI Powered
+         v2.8.0 • SmartCal Pro • AI Conflict Control
        </div>
     </div>
   );

@@ -26,10 +26,11 @@ export interface Task {
   reminderSent?: boolean;
   recurringType?: RecurringType;
   isRecurring?: boolean; 
-  tags: string[]; // Changed from optional string to string array
+  tags: string[]; 
   color?: string; 
   subtasks?: Subtask[]; 
-  customStatus?: 'todo' | 'in_progress' | 'done'; 
+  customStatus?: 'todo' | 'in_progress' | 'done';
+  pomodoroSessions?: number; // Số phiên làm việc đã thực hiện
 }
 
 export interface TelegramConfig {
@@ -44,7 +45,8 @@ export enum ViewMode {
   LIST = 'LIST',
   STATS = 'STATS',
   KANBAN = 'KANBAN',
-  TIMELINE = 'TIMELINE' // New View
+  TIMELINE = 'TIMELINE',
+  FOCUS = 'FOCUS' // New View for Deep Work
 }
 
 export interface AppTheme {
@@ -53,7 +55,6 @@ export interface AppTheme {
   colors: Record<number, string>; // 50, 100, ... 950 -> RGB String "r g b"
 }
 
-// Updated Palettes with Dark Mode support
 export const COLOR_PALETTES: Record<string, { color: string, dot: string, label: string }> = {
   Red: { color: 'bg-red-100 border-red-300 text-red-800 dark:bg-red-900/30 dark:border-red-800 dark:text-red-200', dot: 'bg-red-500', label: 'Đỏ' },
   Orange: { color: 'bg-orange-100 border-orange-300 text-orange-800 dark:bg-orange-900/30 dark:border-orange-800 dark:text-orange-200', dot: 'bg-orange-500', label: 'Cam' },
@@ -66,7 +67,7 @@ export const COLOR_PALETTES: Record<string, { color: string, dot: string, label:
   Blue: { color: 'bg-blue-100 border-blue-300 text-blue-800 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-200', dot: 'bg-blue-500', label: 'Xanh dương' },
   Indigo: { color: 'bg-indigo-100 border-indigo-300 text-indigo-800 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-200', dot: 'bg-indigo-500', label: 'Chàm' },
   Violet: { color: 'bg-violet-100 border-violet-300 text-violet-800 dark:bg-violet-900/30 dark:border-violet-800 dark:text-violet-200', dot: 'bg-violet-500', label: 'Tím' },
-  Purple: { color: 'bg-purple-100 border-purple-300 text-purple-800 dark:bg-purple-900/30 dark:border-purple-800 dark:text-purple-200', dot: 'bg-purple-500', label: 'Tím Huế' },
+  Purple: { color: 'bg-purple-100 border-purple-300 text-purple-800 dark:bg-purple-900/30 dark:border-orange-800 dark:text-purple-200', dot: 'bg-purple-500', label: 'Tím Huế' },
   Fuchsia: { color: 'bg-fuchsia-100 border-fuchsia-300 text-fuchsia-800 dark:bg-fuchsia-900/30 dark:border-fuchsia-800 dark:text-fuchsia-200', dot: 'bg-fuchsia-500', label: 'Hồng cánh sen' },
   Pink: { color: 'bg-pink-100 border-pink-300 text-pink-800 dark:bg-pink-900/30 dark:border-pink-800 dark:text-pink-200', dot: 'bg-pink-500', label: 'Hồng' },
   Rose: { color: 'bg-rose-100 border-rose-300 text-rose-800 dark:bg-rose-900/30 dark:border-rose-800 dark:text-rose-200', dot: 'bg-rose-500', label: 'Hồng đỏ' },

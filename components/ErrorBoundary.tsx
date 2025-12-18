@@ -11,14 +11,14 @@ interface State {
   error?: Error;
 }
 
-// Fix: Added constructor and typed Component with Props and State to resolve "props does not exist" error
+/**
+ * ErrorBoundary component to catch rendering errors and show a fallback UI.
+ */
 class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = {
-      hasError: false
-    };
-  }
+  // Initialize state with property initializer
+  public state: State = {
+    hasError: false
+  };
 
   public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
@@ -51,6 +51,7 @@ class ErrorBoundary extends Component<Props, State> {
       );
     }
 
+    // Accessing children through the inherited this.props
     return this.props.children;
   }
 }
