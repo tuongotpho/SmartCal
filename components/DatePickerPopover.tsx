@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
-import { format, addYears } from 'date-fns';
-import setMonth from 'date-fns/setMonth';
-import setYear from 'date-fns/setYear';
-import startOfYear from 'date-fns/startOfYear';
+import { format, addYears, setMonth, setYear, startOfYear } from 'date-fns';
 
 interface DatePickerPopoverProps {
   currentDate: Date;

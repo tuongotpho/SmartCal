@@ -11,8 +11,7 @@ import {
   Flame, 
   Calendar 
 } from 'lucide-react';
-import { format, isPast, isToday, isFuture } from 'date-fns';
-import parseISO from 'date-fns/parseISO';
+import { format, isPast, isToday, isFuture, parseISO } from 'date-fns';
 
 interface DashboardViewProps {
   filteredTasks: Task[];

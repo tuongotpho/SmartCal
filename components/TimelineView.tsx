@@ -7,11 +7,11 @@ import {
   isSameDay, 
   differenceInDays, 
   addDays,
-  isToday
+  isToday,
+  startOfMonth,
+  startOfDay,
+  parseISO
 } from 'date-fns';
-import startOfMonth from 'date-fns/startOfMonth';
-import startOfDay from 'date-fns/startOfDay';
-import parseISO from 'date-fns/parseISO';
 import { AlertCircle } from 'lucide-react';
 
 interface TimelineViewProps {

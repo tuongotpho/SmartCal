@@ -13,10 +13,10 @@ import {
   differenceInDays,
   differenceInMinutes,
   isSameDay,
-  parseISO
+  parseISO,
+  startOfWeek,
+  startOfMonth
 } from 'date-fns';
-import startOfWeek from 'date-fns/startOfWeek';
-import startOfMonth from 'date-fns/startOfMonth';
 import { 
   RefreshCw, 
   WifiOff, 

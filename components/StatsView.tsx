@@ -3,9 +3,9 @@ import { Task, Tag } from '../types';
 import { 
   format, 
   endOfMonth, 
-  isWithinInterval
+  isWithinInterval,
+  startOfMonth
 } from 'date-fns';
-import startOfMonth from 'date-fns/startOfMonth';
 import { PieChart, CheckCircle2, Circle, TrendingUp, AlertCircle, Target } from 'lucide-react';
 
 interface StatsViewProps {
