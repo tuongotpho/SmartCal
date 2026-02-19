@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   format, 
@@ -11,9 +10,13 @@ import {
   endOfWeek, 
   isWithinInterval, 
   endOfMonth, 
-  startOfWeek,
-  startOfMonth,
+  differenceInDays,
+  differenceInMinutes,
+  isSameDay,
+  parseISO
 } from 'date-fns';
+import startOfWeek from 'date-fns/startOfWeek';
+import startOfMonth from 'date-fns/startOfMonth';
 import { 
   RefreshCw, 
   WifiOff, 
@@ -49,7 +52,7 @@ import FocusView from './components/FocusView';
 import { Task, TelegramConfig, ViewMode, Tag, DEFAULT_TASK_TAGS, RecurringType, AppTheme } from './types';
 import { parseTaskWithGemini, generateReport, checkProposedTaskConflict } from './services/geminiService';
 import { sendTelegramMessage, fetchTelegramUpdates, formatTaskForTelegram } from './services/telegramService';
-import { subscribeToTasks, subscribeToTags, saveTagsToFirestore, addTaskToFirestore, deleteTaskFromFirestore, updateTaskInFirestore, auth, logOut } from './services/firebase';
+import { subscribeToTasks, subscribeToTags, saveTagsToFirestore, addTaskToFirestore, deleteTaskFromFirestore, updateTaskInFirestore, auth, logOut, saveTelegramConfigToFirestore } from './services/firebase';
 import { hapticFeedback } from './services/hapticService';
 
 export const APP_THEMES: AppTheme[] = [
@@ -111,7 +114,14 @@ const App: React.FC = () => {
   const [aiReport, setAiReport] = useState<string | null>(null);
   const [useFirebase, setUseFirebase] = useState(true);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastTelegramUpdateId, setLastTelegramUpdateId] = useState<number>(() => {
+    return parseInt(localStorage.getItem('lastTelegramUpdateId') || '0');
+  });
   
+  // PWA Install Prompt State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
   // Pre-save conflict states (Keep these for the Popup)
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [proposedTask, setProposedTask] = useState<Task | null>(null);
@@ -134,6 +144,85 @@ const App: React.FC = () => {
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
+
+  // Request Notification Permission on Load
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // ==========================================
+  // LOGIC NHẮC VIỆC & TELEGRAM (REALTIME)
+  // ==========================================
+  useEffect(() => {
+    if (!tasks || tasks.length === 0) return;
+    
+    // Chạy kiểm tra mỗi 1 phút
+    const checkInterval = setInterval(async () => {
+       const now = new Date();
+       
+       for (const task of tasks) {
+         // Bỏ qua nếu đã xong hoặc đã nhắc
+         if (task.completed || task.reminderSent) continue;
+         
+         // Parse thời gian task
+         const taskDateTime = parseISO(`${task.date}T${task.time}`);
+         if (isNaN(taskDateTime.getTime())) continue;
+
+         const diffInMinutes = differenceInMinutes(taskDateTime, now);
+
+         // Điều kiện nhắc:
+         // 1. Đúng ngày hôm nay
+         // 2. Còn 30 phút nữa đến giờ (diffInMinutes > 0 && <= 30) 
+         // 3. Hoặc đã quá giờ nhưng chưa quá 60 phút (diffInMinutes <= 0 && > -60) -> Nhắc bù nếu user vừa mở máy
+         const isDueSoon = isSameDay(taskDateTime, now) && diffInMinutes <= 30 && diffInMinutes > -60;
+
+         if (isDueSoon) {
+             // 1. Gửi Browser Notification
+             if ('Notification' in window && Notification.permission === 'granted') {
+                 new Notification(`🔔 Sắp đến hạn: ${task.title}`, {
+                    body: `${task.time} - ${task.description || 'Không có mô tả'}`,
+                    icon: '/icon.png'
+                 });
+             }
+
+             // 2. Gửi Telegram Message (Nếu có cấu hình)
+             if (telegramConfig.botToken && telegramConfig.chatId) {
+                const msg = formatTaskForTelegram(task);
+                await sendTelegramMessage(telegramConfig, msg);
+             }
+
+             // 3. Cập nhật flag reminderSent = true để không nhắc lại
+             const updatedTask = { ...task, reminderSent: true };
+             await handleUpdateTask(updatedTask, false); // false = không hiện toast "Đã lưu"
+             console.log(`Đã gửi nhắc nhở cho task: ${task.title}`);
+         }
+       }
+    }, 60 * 1000); // 1 phút check 1 lần
+
+    return () => clearInterval(checkInterval);
+  }, [tasks, telegramConfig]);
+
+  // PWA Install Event Listener
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = useCallback(async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+      showToast("Đang cài đặt ứng dụng...", "success");
+    }
+  }, [deferredPrompt, showToast]);
 
   useEffect(() => {
     const themeObj = APP_THEMES.find(t => t.name === currentTheme) || APP_THEMES[0];
@@ -262,9 +351,11 @@ const App: React.FC = () => {
   }, [tasks, saveTaskToDatabase]);
 
   const handleUpdateTask = useCallback(async (updatedTask: Task, notify = true) => {
-    // Only check conflict for updates if time/date changed
+    // Only check conflict for updates if time/date changed AND it's not just a reminder flag update
     const oldTask = tasks.find(t => t.id === updatedTask.id);
-    if (oldTask && (oldTask.date !== updatedTask.date || oldTask.time !== updatedTask.time)) {
+    const isReminderUpdate = oldTask && oldTask.reminderSent !== updatedTask.reminderSent && oldTask.time === updatedTask.time;
+
+    if (!isReminderUpdate && oldTask && (oldTask.date !== updatedTask.date || oldTask.time !== updatedTask.time)) {
        const conflictList = await checkProposedTaskConflict(updatedTask, tasks.filter(t => t.id !== updatedTask.id));
        if (conflictList.length > 0) {
          setPendingConflicts(conflictList);
@@ -275,11 +366,22 @@ const App: React.FC = () => {
     }
 
     setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+    
+    // Save to persistence
     if (useFirebase && !isOfflineMode) {
       try {
         await updateTaskInFirestore(updatedTask);
         if (notify) showToast("Đã lưu thay đổi", "success");
-      } catch (e) { showToast("Lỗi cập nhật", "warning"); }
+      } catch (e) { 
+        if(notify) showToast("Lỗi cập nhật", "warning"); 
+      }
+    } else {
+      // Offline persistence
+      if (isOfflineMode) {
+         const newTasks = tasks.map(t => t.id === updatedTask.id ? updatedTask : t);
+         localStorage.setItem('offlineTasks', JSON.stringify(newTasks));
+         if(notify) showToast("Đã lưu (Offline)", "success");
+      }
     }
   }, [tasks, useFirebase, isOfflineMode, showToast]);
 
@@ -305,6 +407,71 @@ const App: React.FC = () => {
     setTaskToDeleteId(null);
   }, [taskToDeleteId, useFirebase, isOfflineMode, showToast]);
 
+  // ==========================================
+  // MANUAL SYNC: FETCH FROM TELEGRAM -> ADD TASKS
+  // ==========================================
+  const handleManualSync = async () => {
+    if (!telegramConfig.botToken) return;
+    setIsSyncing(true);
+    try {
+      // 1. Lấy tin nhắn mới nhất (dựa trên offset)
+      const updates = await fetchTelegramUpdates(telegramConfig, lastTelegramUpdateId + 1);
+      
+      if (updates.length > 0) {
+        let addedCount = 0;
+        let maxId = lastTelegramUpdateId;
+        const availableTags = tags.map(t => t.name);
+
+        for (const update of updates) {
+           if (update.update_id > maxId) maxId = update.update_id;
+           
+           // 2. Dùng AI phân tích nội dung tin nhắn thành Task
+           // Ví dụ tin nhắn: "Họp team 9h sáng mai"
+           const parsedTask = await parseTaskWithGemini(update.message, availableTags);
+           
+           if (parsedTask) {
+             const newTask: Task = {
+                id: "temp",
+                userId: user?.uid || (isOfflineMode ? 'offline_user' : undefined),
+                title: parsedTask.title,
+                date: parsedTask.date,
+                endDate: parsedTask.endDate || parsedTask.date,
+                time: parsedTask.time,
+                duration: parsedTask.duration || "",
+                description: `Import từ Telegram: "${update.message}"`,
+                completed: false,
+                reminderSent: false,
+                recurringType: (parsedTask.recurringType as RecurringType) || 'none',
+                tags: parsedTask.tags || ['Khác'],
+                subtasks: []
+             };
+             
+             // Thêm vào DB (skip check conflict để import nhanh)
+             await handleRequestAddTask(newTask, true); 
+             addedCount++;
+           }
+        }
+
+        // Lưu offset mới để lần sau không load lại tin cũ
+        setLastTelegramUpdateId(maxId);
+        localStorage.setItem('lastTelegramUpdateId', maxId.toString());
+
+        if (addedCount > 0) {
+           showToast(`Đã đồng bộ ${addedCount} công việc từ Telegram!`, "success");
+        } else {
+           showToast("Có tin nhắn nhưng AI không nhận dạng được lịch.", "info");
+        }
+      } else {
+        showToast("Không có tin nhắn mới trên Telegram.", "info");
+      }
+    } catch (e) {
+      console.error("Sync error", e);
+      showToast("Lỗi kết nối Telegram.", "error");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const renderContent = () => {
     switch (viewMode) {
       case ViewMode.STATS: return <StatsView currentDate={currentDate} tasks={tasks} tags={tags} />;
@@ -326,8 +493,7 @@ const App: React.FC = () => {
     >
       <Toast toasts={toasts} onRemove={removeToast} />
       
-      {/* Global Banner Notification Removed per user request */}
-
+      {/* Header with Install Logic passed down */}
       <Header 
         currentDate={currentDate} setCurrentDate={setCurrentDate} getHeaderText={format(currentDate, viewMode === ViewMode.DAY ? 'dd/MM/yyyy' : 'MM/yyyy')}
         onPrev={() => setCurrentDate(prev => addMonths(prev, -1))} onNext={() => setCurrentDate(prev => addMonths(prev, 1))}
@@ -336,6 +502,7 @@ const App: React.FC = () => {
         isDarkMode={isDarkMode} toggleTheme={() => setIsDarkMode(!isDarkMode)} setIsSettingsOpen={setIsSettingsOpen}
         onLogout={() => { if(isOfflineMode) window.location.reload(); else logOut(); }}
         datePickerRef={datePickerRef} searchInputRef={searchInputRef} isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen}
+        deferredPrompt={deferredPrompt} onInstallApp={handleInstallClick}
       />
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
@@ -362,7 +529,29 @@ const App: React.FC = () => {
 
       <AiAssistant tasks={tasks} />
 
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} telegramConfig={telegramConfig} tags={tags} onSaveConfig={setTelegramConfig} onSaveTags={(t) => setTags(t)} onManualSync={() => {}} isSyncing={false} lastSyncTime={format(new Date(), 'HH:mm')} showToast={showToast} currentTheme={currentTheme} setCurrentTheme={setCurrentTheme} themes={APP_THEMES} />
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        telegramConfig={telegramConfig} 
+        tags={tags} 
+        onSaveConfig={(cfg) => {
+          setTelegramConfig(cfg);
+          localStorage.setItem('telegramConfig', JSON.stringify(cfg));
+          // Save to Firestore when updating
+          if (user && useFirebase) {
+             saveTelegramConfigToFirestore(user.uid, cfg);
+             showToast("Cấu hình Telegram đã được đồng bộ lên Cloud", "success");
+          }
+        }} 
+        onSaveTags={(t) => setTags(t)} 
+        onManualSync={handleManualSync} 
+        isSyncing={isSyncing} 
+        lastSyncTime={format(new Date(), 'HH:mm')} 
+        showToast={showToast} 
+        currentTheme={currentTheme} 
+        setCurrentTheme={setCurrentTheme} 
+        themes={APP_THEMES} 
+      />
       
       <EditTaskModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} task={editingTask} tags={tags} onSave={async (t) => { if(t.id === 'temp') await handleRequestAddTask(t); else await handleUpdateTask(t); setIsEditModalOpen(false); }} showToast={showToast} />
       

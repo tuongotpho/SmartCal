@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Task, Tag } from '../types';
 import { 
@@ -12,7 +11,8 @@ import {
   Flame, 
   Calendar 
 } from 'lucide-react';
-import { format, isPast, isToday, isFuture, parseISO } from 'date-fns';
+import { format, isPast, isToday, isFuture } from 'date-fns';
+import parseISO from 'date-fns/parseISO';
 
 interface DashboardViewProps {
   filteredTasks: Task[];

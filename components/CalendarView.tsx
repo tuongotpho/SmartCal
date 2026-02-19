@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   format, 
@@ -13,11 +12,11 @@ import {
   getDate, 
   getMonth, 
   differenceInDays, 
-  isWithinInterval,
-  startOfMonth,
-  startOfWeek,
-  startOfDay
+  isWithinInterval
 } from 'date-fns';
+import startOfMonth from 'date-fns/startOfMonth';
+import startOfWeek from 'date-fns/startOfWeek';
+import startOfDay from 'date-fns/startOfDay';
 import { Task, Tag, ViewMode } from '../types';
 import { Trash2, Calendar as CalendarIcon, Edit3, Repeat, CheckCircle2, Circle, ListChecks, ArrowRight } from 'lucide-react';
 import { generateGoogleCalendarLink } from '../services/googleCalendarService';

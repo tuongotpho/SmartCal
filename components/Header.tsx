@@ -12,7 +12,8 @@ import {
   LogOut, 
   User,
   PanelRightClose,
-  PanelRightOpen
+  PanelRightOpen,
+  Download
 } from 'lucide-react';
 import { format } from 'date-fns';
 import DatePickerPopover from './DatePickerPopover';
@@ -40,6 +41,10 @@ interface HeaderProps {
   searchInputRef: React.RefObject<HTMLInputElement>;
   isSidebarOpen: boolean;
   setIsSidebarOpen: (open: boolean) => void;
+  
+  // PWA Props
+  deferredPrompt?: any;
+  onInstallApp?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -63,7 +68,9 @@ const Header: React.FC<HeaderProps> = ({
   datePickerRef,
   searchInputRef,
   isSidebarOpen,
-  setIsSidebarOpen
+  setIsSidebarOpen,
+  deferredPrompt,
+  onInstallApp
 }) => {
   return (
     <div className="bg-gradient-to-r from-primary-500/95 to-primary-700/95 backdrop-blur-md text-white px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] shadow-md z-30 flex-shrink-0 sticky top-0 transition-all">
@@ -133,6 +140,17 @@ const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="flex gap-2 sm:gap-3 items-center">
+           {/* Install App Button (Desktop PWA) */}
+           {deferredPrompt && (
+              <button 
+                 onClick={onInstallApp}
+                 className="hidden lg:flex items-center gap-1 bg-white text-primary-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-md animate-pulse hover:bg-gray-100 transition"
+                 title="Cài đặt ứng dụng vào máy tính"
+              >
+                 <Download size={14} /> Cài đặt App
+              </button>
+           )}
+
            {/* User Info / Logout (Desktop) */}
            <div className="hidden lg:flex items-center gap-2 mr-2 border-r border-white/20 pr-3">
               {user?.photoURL ? (

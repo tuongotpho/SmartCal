@@ -1,8 +1,7 @@
-
 import firebase from "firebase/compat/app";
 import "firebase/compat/firestore";
 import "firebase/compat/auth";
-import { Task, RecurringType, Tag, DEFAULT_TASK_TAGS, Subtask } from "../types";
+import { Task, RecurringType, Tag, DEFAULT_TASK_TAGS, Subtask, TelegramConfig } from "../types";
 
 // Cấu hình Firebase từ người dùng cung cấp
 const firebaseConfig = {
@@ -200,6 +199,22 @@ export const saveTagsToFirestore = async (userId: string, tags: Tag[]) => {
   } catch (e) {
     console.error("Firebase: Error saving tags", e);
     throw e;
+  }
+};
+
+/**
+ * MỚI: Lưu cấu hình Telegram lên Firestore để Cloud Function dùng
+ */
+export const saveTelegramConfigToFirestore = async (userId: string, config: TelegramConfig) => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) return;
+
+  try {
+    const docRef = db.collection(USERS_COLLECTION).doc(currentUser.uid).collection("config").doc("telegram");
+    await docRef.set(config, { merge: true });
+    console.log("Đã đồng bộ Telegram Config lên Cloud");
+  } catch (e) {
+    console.error("Lỗi lưu Telegram config lên Cloud", e);
   }
 };
 

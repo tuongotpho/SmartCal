@@ -1,12 +1,11 @@
-
 import React, { useMemo } from 'react';
 import { Task, Tag } from '../types';
 import { 
   format, 
   endOfMonth, 
-  isWithinInterval,
-  startOfMonth
+  isWithinInterval
 } from 'date-fns';
+import startOfMonth from 'date-fns/startOfMonth';
 import { PieChart, CheckCircle2, Circle, TrendingUp, AlertCircle, Target } from 'lucide-react';
 
 interface StatsViewProps {

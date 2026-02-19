@@ -46,5 +46,5 @@ export const fetchTelegramUpdates = async (config: TelegramConfig, offset: numbe
 };
 
 export const formatTaskForTelegram = (task: Task): string => {
-  return `📅 <b>Nhắc việc mới!</b>\n\n📌 <b>${task.title}</b>\n⏰ ${task.time} - ${task.date}\n📝 ${task.description || "Không có ghi chú"}`;
+  return `🚨 <b>NHẮC NHỞ: ĐẾN GIỜ LÀM VIỆC!</b> 🚨\n\n📌 <b>${task.title}</b>\n⏰ <b>${task.time}</b> - ${task.date}\n\n📝 ${task.description || "<i>(Không có ghi chú)</i>"}\n\n👉 <i>Hãy hoàn thành và đánh dấu "Đã xong" trên SmartCal nhé!</i>`;
 };

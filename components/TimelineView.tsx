@@ -1,18 +1,17 @@
-
 import React, { useRef, useEffect } from 'react';
 import { Task, Tag } from '../types';
 import { 
   format, 
   eachDayOfInterval, 
-  startOfMonth, 
   endOfMonth, 
   isSameDay, 
   differenceInDays, 
   addDays,
-  isToday,
-  startOfDay,
-  parseISO
+  isToday
 } from 'date-fns';
+import startOfMonth from 'date-fns/startOfMonth';
+import startOfDay from 'date-fns/startOfDay';
+import parseISO from 'date-fns/parseISO';
 import { AlertCircle } from 'lucide-react';
 
 interface TimelineViewProps {

@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Task, RecurringType, Tag, Subtask } from '../types';
-import { X, Save, Calendar, Clock, FileText, Type, Repeat, CheckCircle2, Tag as TagIcon, ListChecks, Plus, Trash2, CheckSquare, Square, ArrowRight, Mic, MicOff, Sparkles, RefreshCw, Wand2 } from 'lucide-react';
+import { X, Save, Calendar, Clock, FileText, Type, Repeat, CheckCircle2, Tag as TagIcon, ListChecks, Plus, Trash2, CheckSquare, Square, ArrowRight, Mic, MicOff, Sparkles, RefreshCw, Wand2, ExternalLink } from 'lucide-react';
 import { ToastType } from './Toast';
 import { parseTaskWithGemini, suggestSubtasks } from '../services/geminiService';
+import { generateGoogleCalendarLink } from '../services/googleCalendarService';
 
 interface EditTaskModalProps {
   isOpen: boolean;
@@ -213,6 +214,13 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
     }
     setFormData({ ...formData, date: newDate, endDate: newEndDate });
   }
+
+  const handleAddToGoogleCalendar = () => {
+    if (!formData) return;
+    const link = generateGoogleCalendarLink(formData);
+    window.open(link, '_blank');
+    showToast("Đang mở Google Calendar...", "info");
+  };
 
   if (!isOpen || !formData) return null;
 
@@ -436,6 +444,16 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
               )}
             </div>
           </div>
+          
+           {/* Google Calendar Sync Button */}
+           <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+               <button 
+                  onClick={handleAddToGoogleCalendar}
+                  className="w-full flex items-center justify-center gap-2 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 py-2 rounded-lg transition"
+               >
+                   <ExternalLink size={14} /> Thêm vào Google Calendar (Nhắc nhở chắc chắn)
+               </button>
+           </div>
 
         </div>
 

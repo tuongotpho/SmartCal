@@ -1,0 +1,15 @@
+# WORKFLOW NÀY ĐÃ ĐƯỢC VÔ HIỆU HÓA
+# Vì bạn đã chuyển sang sử dụng Firebase Cloud Functions (Cách 3) chuyên nghiệp hơn.
+# File này được giữ lại để tham khảo hoặc xóa đi nếu muốn.
+
+name: Daily Task Reminder (Disabled)
+
+on:
+  workflow_dispatch: # Chỉ chạy khi bấm thủ công (để không tự động chạy nữa)
+
+jobs:
+  check-and-notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disabled
+        run: echo "This workflow is disabled in favor of Firebase Cloud Functions."
