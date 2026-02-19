@@ -1,8 +1,8 @@
 
-// Sử dụng firebase compat để tương thích với project hiện tại
-import firebase from 'firebase/compat/app';
-import 'firebase/compat/messaging';
-import 'firebase/compat/firestore';
+// Firebase v10+ modular SDK
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getMessaging, getToken, deleteToken, onMessage, isSupported } from 'firebase/messaging';
+import { getFirestore, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 // Firebase config - same as main app
 const firebaseConfig = {
@@ -15,12 +15,11 @@ const firebaseConfig = {
   measurementId: "G-5PWJQNSEFF"
 };
 
-// Initialize Firebase app for FCM (sử dụng app hiện có nếu đã tồn tại)
-const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore(app);
+// Initialize Firebase app for FCM
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 // VAPID Key - Cần tạo tại Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
-// Thay thế bằng VAPID key thực tế của bạn
 const VAPID_KEY = "BKpLCibJfSV1Q3mPdZYkn07bh6E2gkcadkoJR1DDyhudRWN2q43XFya32-r3HaTw_ha8rb5j_Oqk467IaGB8JdI";
 
 export interface FCMConfig {
@@ -28,16 +27,30 @@ export interface FCMConfig {
   token: string | null;
 }
 
+// Messaging instance (lazy initialization)
+let messagingInstance: ReturnType<typeof getMessaging> | null = null;
+
 /**
  * Kiểm tra xem trình duyệt có hỗ trợ FCM không
  */
-export const checkFCMSupport = (): boolean => {
+export const checkFCMSupport = async (): Promise<boolean> => {
   try {
-    // FCM yêu cầu Service Worker và Notifications API
-    return 'serviceWorker' in navigator && 'Notification' in window;
+    return await isSupported();
   } catch {
     return false;
   }
+};
+
+/**
+ * Get messaging instance safely
+ */
+const getMessagingInstance = async () => {
+  if (!messagingInstance) {
+    const supported = await isSupported();
+    if (!supported) return null;
+    messagingInstance = getMessaging(app);
+  }
+  return messagingInstance;
 };
 
 /**
@@ -46,7 +59,8 @@ export const checkFCMSupport = (): boolean => {
 export const requestFCMPermission = async (): Promise<string | null> => {
   try {
     // Kiểm tra hỗ trợ
-    if (!checkFCMSupport()) {
+    const supported = await checkFCMSupport();
+    if (!supported) {
       console.warn("FCM không được hỗ trợ trên trình duyệt này");
       return null;
     }
@@ -59,10 +73,14 @@ export const requestFCMPermission = async (): Promise<string | null> => {
     }
 
     // Get messaging instance
-    const messaging = firebase.messaging(app);
+    const messaging = await getMessagingInstance();
+    if (!messaging) {
+      console.warn("Không thể khởi tạo messaging");
+      return null;
+    }
 
     // Get FCM token
-    const currentToken = await messaging.getToken({ 
+    const currentToken = await getToken(messaging, { 
       vapidKey: VAPID_KEY 
     });
 
@@ -84,7 +102,8 @@ export const requestFCMPermission = async (): Promise<string | null> => {
  */
 export const saveFCMTokenToFirestore = async (userId: string, token: string): Promise<boolean> => {
   try {
-    await db.collection('users').doc(userId).collection('config').doc('fcm').set({
+    const tokenRef = doc(db, 'users', userId, 'config', 'fcm');
+    await setDoc(tokenRef, {
       token,
       updatedAt: new Date().toISOString(),
       platform: getPlatform()
@@ -102,7 +121,8 @@ export const saveFCMTokenToFirestore = async (userId: string, token: string): Pr
  */
 export const removeFCMTokenFromFirestore = async (userId: string): Promise<boolean> => {
   try {
-    await db.collection('users').doc(userId).collection('config').doc('fcm').delete();
+    const tokenRef = doc(db, 'users', userId, 'config', 'fcm');
+    await deleteDoc(tokenRef);
     console.log("Đã xóa FCM token khỏi Firestore");
     return true;
   } catch (error) {
@@ -116,8 +136,10 @@ export const removeFCMTokenFromFirestore = async (userId: string): Promise<boole
  */
 export const unregisterFCMToken = async (): Promise<boolean> => {
   try {
-    const messaging = firebase.messaging(app);
-    await messaging.deleteToken();
+    const messaging = await getMessagingInstance();
+    if (!messaging) return false;
+    
+    await deleteToken(messaging);
     console.log("Đã hủy đăng ký FCM token");
     return true;
   } catch (error) {
@@ -130,22 +152,28 @@ export const unregisterFCMToken = async (): Promise<boolean> => {
  * Lắng nghe foreground messages (khi app đang mở)
  */
 export const onForegroundMessage = (callback: (payload: any) => void): (() => void) => {
-  try {
-    const messaging = firebase.messaging(app);
-    return messaging.onMessage((payload: any) => {
-      console.log("Foreground message:", payload);
-      callback(payload);
-    });
-  } catch (error) {
+  // Return empty function first, then setup async
+  let unsubscribe: (() => void) = () => {};
+  
+  getMessagingInstance().then((messaging) => {
+    if (messaging) {
+      unsubscribe = onMessage(messaging, (payload) => {
+        console.log("Foreground message:", payload);
+        callback(payload);
+      });
+    }
+  }).catch((error) => {
     console.error("Lỗi khi lắng nghe foreground message:", error);
-    return () => {};
-  }
+  });
+
+  return () => unsubscribe();
 };
 
 /**
  * Lấy platform info
  */
 const getPlatform = (): string => {
+  if (typeof navigator === 'undefined') return 'web';
   const ua = navigator.userAgent;
   if (/android/i.test(ua)) return 'android';
   if (/iPad|iPhone|iPod/.test(ua)) return 'ios';
@@ -157,7 +185,8 @@ const getPlatform = (): string => {
  */
 export const initializeFCM = async (userId: string): Promise<FCMConfig> => {
   try {
-    if (!checkFCMSupport()) {
+    const supported = await checkFCMSupport();
+    if (!supported) {
       return { enabled: false, token: null };
     }
 

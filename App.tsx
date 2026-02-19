@@ -163,7 +163,7 @@ const App: React.FC = () => {
     if (!user || isOfflineMode) return;
     
     const initFCM = async () => {
-      const supported = checkFCMSupport();
+      const supported = await checkFCMSupport();
       if (!supported) {
         console.log("FCM không được hỗ trợ");
         return;
