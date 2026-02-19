@@ -6,6 +6,7 @@ import { utcToZonedTime } from "date-fns-tz";
 
 admin.initializeApp();
 const db = admin.firestore();
+const messaging = admin.messaging();
 
 // Định nghĩa interface cho Task
 interface Task {
@@ -165,6 +166,210 @@ export const realtimeTaskReminder = functions.pubsub
     if (hasUpdates) {
         await batch.commit();
         console.log("Đã cập nhật trạng thái reminderSent cho các task.");
+    }
+
+    return null;
+  });
+
+/**
+ * 3. WEB PUSH REMINDER: Gửi FCM Push Notification
+ * Chạy cùng lúc với Telegram reminder
+ */
+export const pushTaskReminder = functions.pubsub
+  .schedule("*/5 * * * *") // Chạy mỗi 5 phút
+  .timeZone("Asia/Ho_Chi_Minh")
+  .onRun(async (context) => {
+    const now = new Date();
+    const timeZone = "Asia/Ho_Chi_Minh";
+    const zonedDate = utcToZonedTime(now, timeZone);
+    const todayStr = format(zonedDate, "yyyy-MM-dd");
+    
+    const currentHours = parseInt(format(zonedDate, "HH"), 10);
+    const currentMinutes = parseInt(format(zonedDate, "mm"), 10);
+    const currentTotalMinutes = currentHours * 60 + currentMinutes;
+
+    console.log(`[Push] Quét lúc ${format(zonedDate, "HH:mm")} (${todayStr})`);
+
+    // Lấy các task hôm nay chưa hoàn thành và chưa gửi push
+    const tasksSnapshot = await db
+      .collection("tasks")
+      .where("date", "==", todayStr)
+      .where("completed", "==", false)
+      .get();
+
+    if (tasksSnapshot.empty) return null;
+
+    const batch = db.batch();
+    let hasUpdates = false;
+
+    for (const doc of tasksSnapshot.docs) {
+      const task = doc.data() as Task;
+      const taskId = doc.id;
+      
+      if (!task.time || !task.userId) continue;
+      
+      // Bỏ qua nếu đã gửi push (pushSent === true)
+      if ((task as any).pushSent === true) continue;
+
+      const [h, m] = task.time.split(":").map(Number);
+      const taskTotalMinutes = h * 60 + m;
+      const diff = taskTotalMinutes - currentTotalMinutes;
+
+      // Nhắc trong vòng 30 phút hoặc quá giờ không quá 15 phút
+      if (diff <= 30 && diff >= -15) {
+        // Lấy FCM token của user
+        const fcmDoc = await db.doc(`users/${task.userId}/config/fcm`).get();
+        
+        if (fcmDoc.exists) {
+          const fcmData = fcmDoc.data();
+          const fcmToken = fcmData?.token;
+          
+          if (fcmToken) {
+            try {
+              // Gửi FCM Push Notification
+              await messaging.send({
+                token: fcmToken,
+                notification: {
+                  title: `🔔 ${task.title}`,
+                  body: `${task.time} - ${diff > 0 ? `Còn ${diff} phút` : 'Đã đến giờ!'}`,
+                },
+                data: {
+                  taskId: taskId,
+                  type: 'TASK_REMINDER',
+                  url: '/'
+                },
+                android: {
+                  notification: {
+                    icon: 'icon',
+                    color: '#f97316',
+                    sound: 'default',
+                    priority: 'high',
+                    channelId: 'smartcal-reminders'
+                  }
+                },
+                apns: {
+                  payload: {
+                    aps: {
+                      sound: 'default',
+                      badge: 1,
+                      contentAvailable: true
+                    }
+                  }
+                },
+                webpush: {
+                  notification: {
+                    icon: '/icon-192.png',
+                    badge: '/badge-72.png',
+                    requireInteraction: true,
+                    actions: [
+                      { action: 'open', title: 'Mở' },
+                      { action: 'dismiss', title: 'Bỏ qua' }
+                    ]
+                  },
+                  fcmOptions: {
+                    link: '/'
+                  }
+                }
+              });
+
+              // Đánh dấu đã gửi push
+              const taskRef = db.collection("tasks").doc(taskId);
+              batch.update(taskRef, { pushSent: true } as any);
+              hasUpdates = true;
+              console.log(`[Push] Sent to ${fcmToken.substring(0, 20)}... for task ${taskId}`);
+            } catch (error: any) {
+              console.error(`[Push] Error sending to token:`, error.message);
+              
+              // Nếu token không hợp lệ, xóa khỏi Firestore
+              if (error.code === 'messaging/registration-token-not-registered' || 
+                  error.code === 'messaging/invalid-registration-token') {
+                await db.doc(`users/${task.userId}/config/fcm`).delete();
+                console.log(`[Push] Deleted invalid token for user ${task.userId}`);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (hasUpdates) {
+      await batch.commit();
+      console.log("[Push] Đã cập nhật trạng thái pushSent cho các task.");
+    }
+
+    return null;
+  });
+
+/**
+ * 4. DAILY PUSH REMINDER: Tổng hợp công việc buổi sáng qua Push
+ */
+export const dailyPushReminder = functions.pubsub
+  .schedule("0 6 * * *")
+  .timeZone("Asia/Ho_Chi_Minh")
+  .onRun(async (context) => {
+    const now = new Date();
+    const timeZone = "Asia/Ho_Chi_Minh";
+    const zonedDate = utcToZonedTime(now, timeZone);
+    const todayStr = format(zonedDate, "yyyy-MM-dd");
+
+    console.log(`[DailyPush] Bắt đầu quét cho ngày: ${todayStr}`);
+
+    const tasksSnapshot = await db
+      .collection("tasks")
+      .where("date", "==", todayStr)
+      .where("completed", "==", false)
+      .get();
+
+    if (tasksSnapshot.empty) return null;
+
+    const userTasksMap: Record<string, Task[]> = {};
+    
+    tasksSnapshot.forEach((doc) => {
+      const task = doc.data() as Task;
+      if (task.userId) {
+        if (!userTasksMap[task.userId]) userTasksMap[task.userId] = [];
+        userTasksMap[task.userId].push(task);
+      }
+    });
+
+    for (const userId of Object.keys(userTasksMap)) {
+      const tasks = userTasksMap[userId];
+      
+      // Lấy FCM token
+      const fcmDoc = await db.doc(`users/${userId}/config/fcm`).get();
+      
+      if (!fcmDoc.exists) continue;
+
+      const fcmToken = fcmDoc.data()?.token;
+      if (!fcmToken) continue;
+
+      try {
+        const taskCount = tasks.length;
+        const nextTask = tasks.sort((a, b) => a.time.localeCompare(b.time))[0];
+        
+        await messaging.send({
+          token: fcmToken,
+          notification: {
+            title: `🌅 Chào buổi sáng!`,
+            body: `Hôm nay bạn có ${taskCount} công việc. Đầu tiên: ${nextTask.title} lúc ${nextTask.time}`,
+          },
+          data: {
+            type: 'DAILY_SUMMARY',
+            url: '/'
+          },
+          android: {
+            notification: {
+              icon: 'icon',
+              color: '#f97316',
+              sound: 'default'
+            }
+          }
+        });
+        
+        console.log(`[DailyPush] Sent summary to user ${userId}`);
+      } catch (error: any) {
+        console.error(`[DailyPush] Error:`, error.message);
+      }
     }
 
     return null;

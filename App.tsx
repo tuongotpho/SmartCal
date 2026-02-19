@@ -54,6 +54,7 @@ import { parseTaskWithGemini, generateReport, checkProposedTaskConflict } from '
 import { sendTelegramMessage, fetchTelegramUpdates, formatTaskForTelegram } from './services/telegramService';
 import { subscribeToTasks, subscribeToTags, saveTagsToFirestore, addTaskToFirestore, deleteTaskFromFirestore, updateTaskInFirestore, auth, logOut, saveTelegramConfigToFirestore } from './services/firebase';
 import { hapticFeedback } from './services/hapticService';
+import { initializeFCM, onForegroundMessage, checkFCMSupport, FCMConfig } from './services/fcmService';
 
 export const APP_THEMES: AppTheme[] = [
   {
@@ -122,6 +123,9 @@ const App: React.FC = () => {
   // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
+  // FCM State
+  const [fcmConfig, setFcmConfig] = useState<FCMConfig>({ enabled: false, token: null });
+
   // Pre-save conflict states (Keep these for the Popup)
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [proposedTask, setProposedTask] = useState<Task | null>(null);
@@ -151,6 +155,46 @@ const App: React.FC = () => {
       Notification.requestPermission();
     }
   }, []);
+
+  // ==========================================
+  // FCM INITIALIZATION
+  // ==========================================
+  useEffect(() => {
+    if (!user || isOfflineMode) return;
+    
+    const initFCM = async () => {
+      const supported = checkFCMSupport();
+      if (!supported) {
+        console.log("FCM không được hỗ trợ");
+        return;
+      }
+
+      const result = await initializeFCM(user.uid);
+      setFcmConfig(result);
+      
+      if (result.enabled) {
+        showToast("Đã bật thông báo Push!", "success");
+      }
+    };
+
+    initFCM();
+  }, [user, isOfflineMode, showToast]);
+
+  // Listen for foreground FCM messages
+  useEffect(() => {
+    if (!fcmConfig.enabled) return;
+
+    const unsubscribe = onForegroundMessage((payload) => {
+      console.log("Received FCM message:", payload);
+      
+      // Show toast notification
+      if (payload.notification) {
+        showToast(`${payload.notification.title}: ${payload.notification.body}`, 'info');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [fcmConfig.enabled, showToast]);
 
   // ==========================================
   // LOGIC NHẮC VIỆC & TELEGRAM (REALTIME)
@@ -550,7 +594,10 @@ const App: React.FC = () => {
         showToast={showToast} 
         currentTheme={currentTheme} 
         setCurrentTheme={setCurrentTheme} 
-        themes={APP_THEMES} 
+        themes={APP_THEMES}
+        fcmConfig={fcmConfig}
+        onFCMChange={setFcmConfig}
+        userId={user?.uid}
       />
       
       <EditTaskModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} task={editingTask} tags={tags} onSave={async (t) => { if(t.id === 'temp') await handleRequestAddTask(t); else await handleUpdateTask(t); setIsEditModalOpen(false); }} showToast={showToast} />

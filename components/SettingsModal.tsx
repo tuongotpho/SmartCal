@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { TelegramConfig, Tag, COLOR_PALETTES, AppTheme } from '../types';
-import { X, Save, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Palette } from 'lucide-react';
+import { X, Save, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Palette, Bell, BellOff } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 import { ToastType } from './Toast';
+import { checkFCMSupport, initializeFCM, disableFCM, FCMConfig } from '../services/fcmService';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -21,6 +22,11 @@ interface SettingsModalProps {
   currentTheme?: string;
   setCurrentTheme?: (theme: string) => void;
   themes?: AppTheme[];
+  
+  // FCM Props
+  fcmConfig?: FCMConfig;
+  onFCMChange?: (config: FCMConfig) => void;
+  userId?: string;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
@@ -36,7 +42,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   showToast,
   currentTheme,
   setCurrentTheme,
-  themes = []
+  themes = [],
+  fcmConfig,
+  onFCMChange,
+  userId
 }) => {
   const [config, setConfig] = useState<TelegramConfig>(telegramConfig);
   const [currentTags, setCurrentTags] = useState<Tag[]>(tags);
@@ -47,6 +56,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [newTagColorKey, setNewTagColorKey] = useState('Gray');
   const [isColorDropdownOpen, setIsColorDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // FCM State
+  const [localFcmConfig, setLocalFcmConfig] = useState<FCMConfig>(fcmConfig || { enabled: false, token: null });
+  const [isFCMLoading, setIsFCMLoading] = useState(false);
 
   // State cho Modal xác nhận xóa
   const [tagToDelete, setTagToDelete] = useState<string | null>(null);
@@ -94,6 +107,44 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     if (tagToDelete) {
       setCurrentTags(currentTags.filter(t => t.name !== tagToDelete));
       setTagToDelete(null);
+    }
+  };
+
+  // FCM Handlers
+  const handleToggleFCM = async () => {
+    if (!userId) {
+      showToast("Vui lòng đăng nhập để sử dụng tính năng này", "warning");
+      return;
+    }
+
+    setIsFCMLoading(true);
+    try {
+      if (localFcmConfig.enabled) {
+        // Disable FCM
+        const success = await disableFCM(userId);
+        if (success) {
+          setLocalFcmConfig({ enabled: false, token: null });
+          onFCMChange?.({ enabled: false, token: null });
+          showToast("Đã tắt thông báo Push", "info");
+        } else {
+          showToast("Lỗi khi tắt thông báo", "error");
+        }
+      } else {
+        // Enable FCM
+        const result = await initializeFCM(userId);
+        setLocalFcmConfig(result);
+        onFCMChange?.(result);
+        if (result.enabled) {
+          showToast("Đã bật thông báo Push!", "success");
+        } else {
+          showToast("Không thể bật thông báo. Vui lòng cho phép quyền thông báo.", "warning");
+        }
+      }
+    } catch (error) {
+      console.error("FCM toggle error:", error);
+      showToast("Lỗi khi thay đổi cài đặt thông báo", "error");
+    } finally {
+      setIsFCMLoading(false);
     }
   };
 
@@ -201,6 +252,51 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     {isSyncing ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                     {config.botToken ? "Quét tin nhắn Telegram ngay" : "Vui lòng nhập Token trước"}
                   </button>
+                </div>
+              </div>
+
+              {/* Web Push Notifications Section */}
+              <div className="space-y-4">
+                <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
+                  <Bell size={16} className="text-green-500" /> Thông báo Push (Web Push)
+                </h3>
+                
+                <div className="bg-green-50 dark:bg-green-900/10 p-3 rounded-lg border border-green-100 dark:border-green-900/30">
+                  <div className="flex justify-between items-center mb-2">
+                    <div>
+                      <span className="text-xs font-semibold text-green-800 dark:text-green-300">
+                        {localFcmConfig.enabled ? 'Đang bật' : 'Đang tắt'}
+                      </span>
+                      {localFcmConfig.token && (
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                          Token: {localFcmConfig.token.substring(0, 20)}...
+                        </p>
+                      )}
+                    </div>
+                    <button 
+                      onClick={handleToggleFCM}
+                      disabled={isFCMLoading || !userId}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5
+                        ${isFCMLoading 
+                          ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed' 
+                          : localFcmConfig.enabled 
+                            ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50'
+                            : 'bg-green-500 text-white hover:bg-green-600'}
+                      `}
+                    >
+                      {isFCMLoading ? (
+                        <RefreshCw size={12} className="animate-spin" />
+                      ) : localFcmConfig.enabled ? (
+                        <BellOff size={12} />
+                      ) : (
+                        <Bell size={12} />
+                      )}
+                      {isFCMLoading ? 'Đang xử lý...' : localFcmConfig.enabled ? 'Tắt' : 'Bật'}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                    Web Push cho phép nhận thông báo ngay cả khi đóng trình duyệt. Yêu cầu cho phép quyền thông báo.
+                  </p>
                 </div>
               </div>
             </div>
