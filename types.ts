@@ -31,6 +31,7 @@ export interface Task {
   subtasks?: Subtask[];
   customStatus?: 'todo' | 'in_progress' | 'done';
   pomodoroSessions?: number; // Số phiên làm việc đã thực hiện
+  snoozedUntil?: number; // Timestamp Unix cho tính năng báo lại
 }
 
 export interface TelegramConfig {

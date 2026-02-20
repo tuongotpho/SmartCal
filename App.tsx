@@ -478,6 +478,11 @@ const App: React.FC = () => {
         // Bỏ qua nếu đã xong hoặc đã nhắc
         if (task.completed || task.reminderSent) continue;
 
+        // Bỏ qua nếu đang trong thời gian báo lại (Snooze)
+        if (task.snoozedUntil && now.getTime() < task.snoozedUntil) {
+          continue;
+        }
+
         // Parse thời gian task
         const taskDateTime = parseISO(`${task.date}T${task.time}`);
         if (isNaN(taskDateTime.getTime())) continue;
@@ -551,8 +556,9 @@ const App: React.FC = () => {
 
   const handleReminderSnooze = useCallback((minutes: number) => {
     if (reminderTask) {
-      // Reset reminderSent để nhắc lại sau
-      const updatedTask = { ...reminderTask, reminderSent: false };
+      // Reset reminderSent và thêm snoozedUntil để bỏ qua việc nhắc trong x khoảng thời gian
+      const snoozeTime = new Date().getTime() + minutes * 60000;
+      const updatedTask = { ...reminderTask, reminderSent: false, snoozedUntil: snoozeTime };
       handleUpdateTask(updatedTask, false);
       showToast(`Sẽ nhắc lại sau ${minutes} phút`, "info");
       addNotification("Hoãn nhắc nhở", `Đã hoãn việc "${reminderTask.title}" thêm ${minutes} phút.`, "info", false);
