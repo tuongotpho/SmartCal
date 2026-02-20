@@ -69,14 +69,22 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
     console.warn("Gemini API key chưa được cấu hình. Vào Cài đặt để nhập API key.");
     return null;
   }
-  
+
   try {
     const today = new Date().toISOString().split('T')[0];
     const tagsToUse = availableTags.length > 0 ? availableTags : ['Khác'];
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Phân tích: "${input}". Hôm nay: ${today}. Trả về JSON ARRAY danh sách các công việc được trích xuất.`,
+      contents: `Phân tích: "${input}". Hôm nay: ${today}. 
+      Yêu cầu:
+      1. Xác định TẤT CẢ các sự kiện riêng biệt. Ví dụ: "Thứ 2 làm A, thứ 3 làm B" -> 2 sự kiện.
+      2. Nếu không rõ ngày, mặc định là hôm nay.
+      3. Nếu không rõ giờ, mặc định 08:00.
+      4. Trả về JSON ARRAY (Kể cả chỉ có 1 sự kiện).
+      
+      Output JSON Schema: Array<{ title: string, date: string (YYYY-MM-DD), time: string (HH:mm), endDate: string, duration: string, description: string, recurringType: string, tags: string[] }>
+      `,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -101,12 +109,15 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
 
     if (response.text) {
       const data = JSON.parse(response.text.trim());
-      // Đảm bảo kết quả là mảng
+      // Force array structure
       const tasks = Array.isArray(data) ? data : [data];
-      
+
+      console.log("Gemini parsed tasks:", tasks); // Debug log
+
       return tasks.map((t: any) => ({
         ...t,
-        endDate: t.endDate || t.date // Fallback endDate nếu thiếu
+        endDate: t.endDate || t.date,
+        tags: t.tags && t.tags.length > 0 ? t.tags : ['Khác']
       }));
     }
     return null;
@@ -127,7 +138,7 @@ export const checkProposedTaskConflict = async (proposedTask: Partial<Task>, exi
   // BƯỚC 2: Gọi AI kiểm tra các xung đột phức tạp hơn (quá sát giờ)
   const ai = getAiInstance();
   if (!ai) return [];
-  
+
   try {
     const activeTasks = existingTasks
       .filter(t => !t.completed && t.date === proposedTask.date)
@@ -154,7 +165,7 @@ export const checkProposedTaskConflict = async (proposedTask: Partial<Task>, exi
 export const analyzeScheduleConflicts = async (tasks: Task[]): Promise<string[]> => {
   const ai = getAiInstance();
   if (!ai) return [];
-  
+
   try {
     const simpleTasks = tasks.filter(t => !t.completed).map(t => ({ title: t.title, date: t.date, time: t.time }));
     if (simpleTasks.length < 2) return [];
@@ -177,7 +188,7 @@ export const analyzeScheduleConflicts = async (tasks: Task[]): Promise<string[]>
 export const suggestSubtasks = async (taskTitle: string, taskDescription?: string): Promise<string[]> => {
   const ai = getAiInstance();
   if (!ai) return [];
-  
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
@@ -196,7 +207,7 @@ export const suggestSubtasks = async (taskTitle: string, taskDescription?: strin
 export const generateReport = async (tasks: Task[], range: string): Promise<string> => {
   const ai = getAiInstance();
   if (!ai) return "Chưa cấu hình Gemini API key. Vào Cài đặt > Cấu hình chung để nhập API key.";
-  
+
   try {
     const tasksData = tasks.map(t => ({ title: t.title, date: t.date, status: t.completed ? "Xong" : "Chưa" }));
     const response = await ai.models.generateContent({
@@ -212,7 +223,7 @@ export const generateReport = async (tasks: Task[], range: string): Promise<stri
 export const chatWithCalendar = async (question: string, tasks: Task[]): Promise<string> => {
   const ai = getAiInstance();
   if (!ai) return "Chưa cấu hình Gemini API key. Vào Cài đặt > Cấu hình chung để nhập API key.";
-  
+
   try {
     const simpleTasks = tasks.map(t => ({ title: t.title, date: t.date, time: t.time, status: t.completed ? "Xong" : "Chưa" }));
     const response = await ai.models.generateContent({

@@ -53,7 +53,7 @@ import ReminderModal from './components/ReminderModal';
 
 import { Task, TelegramConfig, ViewMode, Tag, DEFAULT_TASK_TAGS, RecurringType, AppTheme } from './types';
 import { parseTaskWithGemini, generateReport, checkProposedTaskConflict } from './services/geminiService';
-import { sendTelegramMessage, fetchTelegramUpdates, formatTaskForTelegram } from './services/telegramService';
+import { sendTelegramMessage, fetchTelegramUpdates, formatTaskForTelegram, formatNewTaskForTelegram } from './services/telegramService';
 import { subscribeToTasks, subscribeToTags, saveTagsToFirestore, addTaskToFirestore, deleteTaskFromFirestore, updateTaskInFirestore, auth, logOut, saveTelegramConfigToFirestore } from './services/firebase';
 import { hapticFeedback } from './services/hapticService';
 import { initializeFCM, onForegroundMessage, checkFCMSupport, FCMConfig } from './services/fcmService';
@@ -411,6 +411,17 @@ const App: React.FC = () => {
       hapticFeedback.warning();
     } else {
       await saveTaskToDatabase(task);
+
+      // Gửi thông báo Telegram khi tạo mới (nếu có config)
+      if (task.id === 'temp' && telegramConfig.botToken && telegramConfig.chatId) {
+        try {
+          const msg = formatNewTaskForTelegram(task);
+          await sendTelegramMessage(telegramConfig, msg);
+          console.log("Sent Telegram notification for new task:", task.title);
+        } catch (error) {
+          console.error("Failed to send creation notification to Telegram", error);
+        }
+      }
     }
   }, [tasks, saveTaskToDatabase]);
 
@@ -518,7 +529,9 @@ const App: React.FC = () => {
 
           // 2. Dùng AI phân tích nội dung tin nhắn thành Task
           // Ví dụ tin nhắn: "Họp team 9h sáng mai"
+          console.log("Processing update:", update.message);
           const parsedTasks = await parseTaskWithGemini(update.message, availableTags);
+          console.log("Parsed tasks:", parsedTasks);
 
           if (parsedTasks && parsedTasks.length > 0) {
             for (const taskData of parsedTasks) {
@@ -538,10 +551,13 @@ const App: React.FC = () => {
                 subtasks: []
               };
 
+              console.log("Adding task from Telegram:", newTask.title);
               // Thêm vào DB (skip check conflict để import nhanh)
               await handleRequestAddTask(newTask, true);
               addedCount++;
             }
+          } else {
+            console.warn("AI returned no tasks for message:", update.message);
           }
         }
 

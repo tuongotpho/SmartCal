@@ -3,7 +3,7 @@ import { Task, TelegramConfig } from "../types";
 
 export const sendTelegramMessage = async (config: TelegramConfig, message: string) => {
   if (!config.botToken || !config.chatId) return;
-  
+
   try {
     const url = `https://api.telegram.org/bot${config.botToken}/sendMessage`;
     await fetch(url, {
@@ -28,7 +28,7 @@ export const fetchTelegramUpdates = async (config: TelegramConfig, offset: numbe
     const url = `https://api.telegram.org/bot${config.botToken}/getUpdates?limit=10&offset=${offset}`;
     const res = await fetch(url);
     const data = await res.json();
-    
+
     if (data.ok && Array.isArray(data.result)) {
       // Trả về cả update_id để client lưu lại trạng thái
       return data.result
@@ -47,4 +47,8 @@ export const fetchTelegramUpdates = async (config: TelegramConfig, offset: numbe
 
 export const formatTaskForTelegram = (task: Task): string => {
   return `🚨 <b>NHẮC NHỞ: ĐẾN GIỜ LÀM VIỆC!</b> 🚨\n\n📌 <b>${task.title}</b>\n⏰ <b>${task.time}</b> - ${task.date}\n\n📝 ${task.description || "<i>(Không có ghi chú)</i>"}\n\n👉 <i>Hãy hoàn thành và đánh dấu "Đã xong" trên SmartCal nhé!</i>`;
+};
+
+export const formatNewTaskForTelegram = (task: Task): string => {
+  return `✅ <b>ĐÃ TẠO CÔNG VIỆC MỚI</b>\n\n📌 <b>${task.title}</b>\n⏰ <b>${task.time}</b> - ${task.date}\n\n📝 ${task.description || "<i>(Không có ghi chú)</i>"}\n\n📅 <i>Đã lưu vào lịch làm việc của bạn.</i>`;
 };
