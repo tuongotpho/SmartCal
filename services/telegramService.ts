@@ -4,19 +4,40 @@ import { Task, TelegramConfig } from "../types";
 export const sendTelegramMessage = async (config: TelegramConfig, message: string) => {
   if (!config.botToken || !config.chatId) return;
 
-  try {
-    const url = `https://api.telegram.org/bot${config.botToken}/sendMessage`;
-    await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: config.chatId,
-        text: message,
-        parse_mode: 'HTML'
-      })
-    });
-  } catch (error) {
-    console.error("Failed to send Telegram message", error);
+  const url = `https://api.telegram.org/bot${config.botToken}/sendMessage`;
+  const body = JSON.stringify({
+    chat_id: config.chatId,
+    text: message,
+    parse_mode: 'HTML'
+  });
+
+  let retries = 0;
+  while (retries < 3) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: body
+      });
+
+      if (res.ok) return;
+
+      if (res.status === 429) {
+        const data = await res.json();
+        const retryAfter = data.parameters?.retry_after || 5; // Default 5s
+        console.warn(`Telegram Rate Limit Hit. Waiting ${retryAfter}s...`);
+        await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+        retries++;
+        continue;
+      }
+
+      const errorData = await res.json();
+      console.error("Telegram Error:", errorData);
+      break; // Other errors, don't retry immediately
+    } catch (error) {
+      console.error("Failed to send Telegram message", error);
+      break;
+    }
   }
 };
 

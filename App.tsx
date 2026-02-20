@@ -519,7 +519,7 @@ const App: React.FC = () => {
     }
 
     // Nếu đang sync thì thôi, tránh chồng chéo
-    if (isSyncing) return;
+    if (isSyncing) return; // Note: isSyncing ref might be better here to avoid dependency change, but let's stick to simple fix first
 
     if (!isSilent) setIsSyncing(true);
 
@@ -535,11 +535,10 @@ const App: React.FC = () => {
         for (const update of updates) {
           if (update.update_id > maxId) maxId = update.update_id;
 
-          // 2. Dùng AI phân tích nội dung tin nhắn thành Task
-          // Ví dụ tin nhắn: "Họp team 9h sáng mai"
+          // 2. Dùng AI phân tích
           console.log("Processing update:", update.message);
+          // Rate limit: Wait 1s between Gemini calls if needed, but important for Tele updates loop
           const parsedTasks = await parseTaskWithGemini(update.message, availableTags);
-          console.log("Parsed tasks:", parsedTasks);
 
           if (parsedTasks && parsedTasks.length > 0) {
             for (const taskData of parsedTasks) {
@@ -560,17 +559,20 @@ const App: React.FC = () => {
               };
 
               console.log("Adding task from Telegram:", newTask.title);
-              // Thêm vào DB (skip check conflict để import nhanh)
-              // NOTE: handleRequestAddTask đã được sửa để gửi thông báo lại vào Telegram
               await handleRequestAddTask(newTask, true);
               addedCount++;
+
+              // Rate limit: Delay 1s between adds to avoid hitting Telegram "send message" limit
+              await new Promise(res => setTimeout(res, 1000));
             }
           } else {
             console.warn("AI returned no tasks for message:", update.message);
           }
+          // Delay between messages
+          await new Promise(res => setTimeout(res, 500));
         }
 
-        // Lưu offset mới để lần sau không load lại tin cũ
+        // Lưu offset mới
         setLastTelegramUpdateId(maxId);
         localStorage.setItem('lastTelegramUpdateId', maxId.toString());
 
@@ -584,22 +586,28 @@ const App: React.FC = () => {
       }
     } catch (e) {
       console.error("Sync error", e);
-      if (!isSilent) showToast("Lỗi kết nối Telegram.", "error");
+      if (!isSilent) showToast("Lỗi kết nối Telegram (Many Requests?).", "error");
     } finally {
       if (!isSilent) setIsSyncing(false);
     }
   }, [telegramConfig, lastTelegramUpdateId, tags, handleRequestAddTask, showToast, isSyncing, user, isOfflineMode]);
+
+  // Use a ref to store the latest sync function ensures useEffect doesn't reset interval
+  const savedSyncCallback = useRef(handleManualSync);
+  useEffect(() => {
+    savedSyncCallback.current = handleManualSync;
+  }, [handleManualSync]);
 
   // Auto-Sync Effect
   useEffect(() => {
     if (!telegramConfig.botToken || !telegramConfig.chatId) return;
 
     const intervalId = setInterval(() => {
-      handleManualSync(true); // Silent sync
+      savedSyncCallback.current(true); // Silent sync
     }, 60 * 1000); // 60 seconds
 
     return () => clearInterval(intervalId);
-  }, [telegramConfig, handleManualSync]);
+  }, [telegramConfig]); // Only restart if config changes
 
   const renderContent = () => {
     switch (viewMode) {
