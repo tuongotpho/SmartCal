@@ -104,6 +104,8 @@ const App: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullY, setPullY] = useState(0);
   const startY = useRef(0);
+  // In-memory snooze map: taskId -> snoozedUntil (timestamp). Lives in ref so interval always reads latest without re-registering.
+  const snoozedTasksRef = useRef<Map<string, number>>(new Map());
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -478,9 +480,15 @@ const App: React.FC = () => {
         // Bỏ qua nếu đã xong hoặc đã nhắc
         if (task.completed || task.reminderSent) continue;
 
-        // Bỏ qua nếu đang trong thời gian báo lại (Snooze)
-        if (task.snoozedUntil && now.getTime() < task.snoozedUntil) {
-          continue;
+        // Bỏ qua nếu đang trong thời gian Snooze (lưu trong bộ nhớ, không qua Firestore)
+        const snoozedUntil = snoozedTasksRef.current.get(task.id);
+        if (snoozedUntil) {
+          if (now.getTime() < snoozedUntil) {
+            continue; // Chưa hết thời gian báo lại, bỏ qua
+          } else {
+            // Hết snooze -> dọn dẹp map và cho phép nhắc lại
+            snoozedTasksRef.current.delete(task.id);
+          }
         }
 
         // Parse thời gian task
@@ -556,16 +564,14 @@ const App: React.FC = () => {
 
   const handleReminderSnooze = useCallback((minutes: number) => {
     if (reminderTask) {
-      // Reset reminderSent và thêm snoozedUntil để bỏ qua việc nhắc trong x khoảng thời gian
-      const snoozeTime = new Date().getTime() + minutes * 60000;
-      const updatedTask = { ...reminderTask, reminderSent: false, snoozedUntil: snoozeTime };
-      handleUpdateTask(updatedTask, false);
+      // Lưu thời gian "ngủ đông" trong bộ nhớ (ref) — KHÔNG dùng Firestore để tránh race condition với real-time listener
+      snoozedTasksRef.current.set(reminderTask.id, Date.now() + minutes * 60000);
       showToast(`Sẽ nhắc lại sau ${minutes} phút`, "info");
       addNotification("Hoãn nhắc nhở", `Đã hoãn việc "${reminderTask.title}" thêm ${minutes} phút.`, "info", false);
     }
     setIsReminderModalOpen(false);
     setReminderTask(null);
-  }, [reminderTask, handleUpdateTask, showToast, addNotification]);
+  }, [reminderTask, showToast, addNotification]);
 
   const handleReminderComplete = useCallback(async () => {
     if (reminderTask) {
