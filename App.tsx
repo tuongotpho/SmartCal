@@ -15,7 +15,8 @@ import {
   isSameDay,
   parseISO,
   startOfWeek,
-  startOfMonth
+  startOfMonth,
+  addMinutes
 } from 'date-fns';
 import { 
   RefreshCw, 
@@ -48,6 +49,7 @@ import DashboardView from './components/DashboardView';
 import KanbanView from './components/KanbanView';
 import TimelineView from './components/TimelineView';
 import FocusView from './components/FocusView';
+import ReminderModal from './components/ReminderModal';
 
 import { Task, TelegramConfig, ViewMode, Tag, DEFAULT_TASK_TAGS, RecurringType, AppTheme } from './types';
 import { parseTaskWithGemini, generateReport, checkProposedTaskConflict } from './services/geminiService';
@@ -55,6 +57,7 @@ import { sendTelegramMessage, fetchTelegramUpdates, formatTaskForTelegram } from
 import { subscribeToTasks, subscribeToTags, saveTagsToFirestore, addTaskToFirestore, deleteTaskFromFirestore, updateTaskInFirestore, auth, logOut, saveTelegramConfigToFirestore } from './services/firebase';
 import { hapticFeedback } from './services/hapticService';
 import { initializeFCM, onForegroundMessage, checkFCMSupport, FCMConfig } from './services/fcmService';
+import { soundService } from './services/soundService';
 
 export const APP_THEMES: AppTheme[] = [
   {
@@ -125,6 +128,20 @@ const App: React.FC = () => {
 
   // FCM State
   const [fcmConfig, setFcmConfig] = useState<FCMConfig>({ enabled: false, token: null });
+
+  // Reminder Modal State
+  const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
+  const [reminderTask, setReminderTask] = useState<Task | null>(null);
+  
+  // Reminder Settings (thời gian nhắc trước, mặc định 60 phút)
+  const [reminderMinutesBefore, setReminderMinutesBefore] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('reminder_minutes_before');
+      return saved ? parseInt(saved) : 60;
+    } catch {
+      return 60;
+    }
+  });
 
   // Pre-save conflict states (Keep these for the Popup)
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
@@ -202,7 +219,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!tasks || tasks.length === 0) return;
     
-    // Chạy kiểm tra mỗi 1 phút
+    // Chạy kiểm tra mỗi 30 giây
     const checkInterval = setInterval(async () => {
        const now = new Date();
        
@@ -216,14 +233,17 @@ const App: React.FC = () => {
 
          const diffInMinutes = differenceInMinutes(taskDateTime, now);
 
-         // Điều kiện nhắc:
-         // 1. Đúng ngày hôm nay
-         // 2. Còn 30 phút nữa đến giờ (diffInMinutes > 0 && <= 30) 
-         // 3. Hoặc đã quá giờ nhưng chưa quá 60 phút (diffInMinutes <= 0 && > -60) -> Nhắc bù nếu user vừa mở máy
-         const isDueSoon = isSameDay(taskDateTime, now) && diffInMinutes <= 30 && diffInMinutes > -60;
+         // Điều kiện nhắc: Còn <= reminderMinutesBefore phút và chưa quá giờ
+         const shouldRemind = isSameDay(taskDateTime, now) && 
+                              diffInMinutes <= reminderMinutesBefore && 
+                              diffInMinutes > 0;
 
-         if (isDueSoon) {
-             // 1. Gửi Browser Notification
+         if (shouldRemind) {
+             // 1. Hiển thị Reminder Modal
+             setReminderTask(task);
+             setIsReminderModalOpen(true);
+             
+             // 2. Gửi Browser Notification
              if ('Notification' in window && Notification.permission === 'granted') {
                  new Notification(`🔔 Sắp đến hạn: ${task.title}`, {
                     body: `${task.time} - ${task.description || 'Không có mô tả'}`,
@@ -231,22 +251,22 @@ const App: React.FC = () => {
                  });
              }
 
-             // 2. Gửi Telegram Message (Nếu có cấu hình)
+             // 3. Gửi Telegram Message (Nếu có cấu hình)
              if (telegramConfig.botToken && telegramConfig.chatId) {
                 const msg = formatTaskForTelegram(task);
                 await sendTelegramMessage(telegramConfig, msg);
              }
 
-             // 3. Cập nhật flag reminderSent = true để không nhắc lại
+             // 4. Cập nhật flag reminderSent = true để không nhắc lại
              const updatedTask = { ...task, reminderSent: true };
-             await handleUpdateTask(updatedTask, false); // false = không hiện toast "Đã lưu"
+             await handleUpdateTask(updatedTask, false);
              console.log(`Đã gửi nhắc nhở cho task: ${task.title}`);
          }
        }
-    }, 60 * 1000); // 1 phút check 1 lần
+    }, 30 * 1000); // 30 giây check 1 lần
 
     return () => clearInterval(checkInterval);
-  }, [tasks, telegramConfig]);
+  }, [tasks, telegramConfig, reminderMinutesBefore]);
 
   // PWA Install Event Listener
   useEffect(() => {
@@ -441,6 +461,33 @@ const App: React.FC = () => {
     if (nextState) { hapticFeedback.medium(); showToast(`Đã xong: ${task.title}`, "success"); }
   }, [useFirebase, isOfflineMode, showToast]);
 
+  // Handler cho Reminder Modal
+  const handleReminderClose = useCallback(() => {
+    setIsReminderModalOpen(false);
+    setReminderTask(null);
+  }, []);
+
+  const handleReminderSnooze = useCallback((minutes: number) => {
+    if (reminderTask) {
+      // Reset reminderSent để nhắc lại sau
+      const updatedTask = { ...reminderTask, reminderSent: false };
+      handleUpdateTask(updatedTask, false);
+      showToast(`Sẽ nhắc lại sau ${minutes} phút`, "info");
+    }
+    setIsReminderModalOpen(false);
+    setReminderTask(null);
+  }, [reminderTask, handleUpdateTask, showToast]);
+
+  const handleReminderComplete = useCallback(async () => {
+    if (reminderTask) {
+      const updatedTask = { ...reminderTask, completed: true };
+      await handleUpdateTask(updatedTask, false);
+      showToast(`Đã hoàn thành: ${reminderTask.title}`, "success");
+    }
+    setIsReminderModalOpen(false);
+    setReminderTask(null);
+  }, [reminderTask, handleUpdateTask, showToast]);
+
   const executeDeleteTask = useCallback(async () => {
     if (!taskToDeleteId) return;
     try {
@@ -598,6 +645,11 @@ const App: React.FC = () => {
         fcmConfig={fcmConfig}
         onFCMChange={setFcmConfig}
         userId={user?.uid}
+        reminderMinutesBefore={reminderMinutesBefore}
+        onReminderMinutesChange={(minutes) => {
+          setReminderMinutesBefore(minutes);
+          localStorage.setItem('reminder_minutes_before', minutes.toString());
+        }}
       />
       
       <EditTaskModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} task={editingTask} tags={tags} onSave={async (t) => { if(t.id === 'temp') await handleRequestAddTask(t); else await handleUpdateTask(t); setIsEditModalOpen(false); }} showToast={showToast} />
@@ -616,6 +668,16 @@ const App: React.FC = () => {
         }} 
         conflicts={pendingConflicts} 
         taskTitle={proposedTask?.title || ""} 
+      />
+
+      {/* Reminder Modal */}
+      <ReminderModal
+        isOpen={isReminderModalOpen}
+        task={reminderTask}
+        tags={tags}
+        onClose={handleReminderClose}
+        onSnooze={handleReminderSnooze}
+        onMarkComplete={handleReminderComplete}
       />
     </div>
   );

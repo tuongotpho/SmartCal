@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { TelegramConfig, Tag, COLOR_PALETTES, AppTheme } from '../types';
-import { X, Save, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Palette, Bell, BellOff, Key, Sparkles } from 'lucide-react';
+import { X, Save, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Palette, Bell, BellOff, Key, Sparkles, AlarmClock } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 import { ToastType } from './Toast';
 import { checkFCMSupport, initializeFCM, disableFCM, FCMConfig } from '../services/fcmService';
@@ -28,6 +28,10 @@ interface SettingsModalProps {
   fcmConfig?: FCMConfig;
   onFCMChange?: (config: FCMConfig) => void;
   userId?: string;
+  
+  // Reminder Props
+  reminderMinutesBefore?: number;
+  onReminderMinutesChange?: (minutes: number) => void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
@@ -46,7 +50,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   themes = [],
   fcmConfig,
   onFCMChange,
-  userId
+  userId,
+  reminderMinutesBefore = 60,
+  onReminderMinutesChange
 }) => {
   const [config, setConfig] = useState<TelegramConfig>(telegramConfig);
   const [currentTags, setCurrentTags] = useState<Tag[]>(tags);
@@ -70,6 +76,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       return '';
     }
   });
+
+  // Reminder Minutes State
+  const [localReminderMinutes, setLocalReminderMinutes] = useState<number>(reminderMinutesBefore);
 
   // State cho Modal xác nhận xóa
   const [tagToDelete, setTagToDelete] = useState<string | null>(null);
@@ -341,6 +350,35 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   </p>
                 </div>
               </div>
+
+              {/* Reminder Settings Section */}
+              <div className="space-y-4">
+                <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
+                  <AlarmClock size={16} className="text-orange-500" /> Cài đặt Nhắc nhở
+                </h3>
+                
+                <div className="bg-orange-50 dark:bg-orange-900/10 p-3 rounded-lg border border-orange-100 dark:border-orange-900/30">
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                    Thời gian nhắc trước sự kiện
+                  </label>
+                  <select
+                    value={localReminderMinutes}
+                    onChange={(e) => setLocalReminderMinutes(parseInt(e.target.value))}
+                    className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                  >
+                    <option value={5}>5 phút trước</option>
+                    <option value={10}>10 phút trước</option>
+                    <option value={15}>15 phút trước</option>
+                    <option value={30}>30 phút trước</option>
+                    <option value={60}>1 tiếng trước</option>
+                    <option value={120}>2 tiếng trước</option>
+                    <option value={1440}>1 ngày trước</option>
+                  </select>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-2">
+                    Hiển thị modal thông báo với âm thanh chuông trước khi sự kiện bắt đầu.
+                  </p>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="space-y-4 h-full flex flex-col">
@@ -432,6 +470,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               onSaveTags(currentTags);
               // Save Gemini API Key
               saveGeminiApiKey(geminiApiKey);
+              // Save Reminder Minutes
+              if (onReminderMinutesChange && localReminderMinutes !== reminderMinutesBefore) {
+                onReminderMinutesChange(localReminderMinutes);
+              }
               showToast("Đã lưu cấu hình", "success");
               onClose();
             }}
