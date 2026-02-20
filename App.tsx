@@ -479,19 +479,24 @@ const App: React.FC = () => {
       const now = new Date();
 
       for (const task of tasks) {
-        // Bỏ qua nếu đã xong hoặc đã nhắc
-        if (task.completed || task.reminderSent) continue;
+        // Bỏ qua nếu đã xong
+        if (task.completed) continue;
 
-        // Bỏ qua nếu đang trong thời gian Snooze (lưu trong bộ nhớ, không qua Firestore)
+        // Kiểm tra Snooze TRƯỚC (ưu tiên cao hơn reminderSent)
         const snoozedUntil = snoozedTasksRef.current.get(task.id);
+        let snoozeJustExpired = false;
         if (snoozedUntil) {
           if (now.getTime() < snoozedUntil) {
-            continue; // Chưa hết thời gian báo lại, bỏ qua
+            continue; // Chưa hết giờ ngủ, bỏ qua
           } else {
-            // Hết snooze -> dọn dẹp map và cho phép nhắc lại
+            // Snooze vừa hết hạn: dọn map, cho phép nhắc lại dù reminderSent = true
             snoozedTasksRef.current.delete(task.id);
+            snoozeJustExpired = true;
           }
         }
+
+        // Bỏ qua nếu đã nhắc — TRỪ KHI snooze vừa hết
+        if (task.reminderSent && !snoozeJustExpired) continue;
 
         // Parse thời gian task
         const taskDateTime = parseISO(`${task.date}T${task.time}`);
