@@ -621,7 +621,9 @@ const App: React.FC = () => {
         localStorage.setItem('lastTelegramUpdateId', maxId.toString());
 
         if (addedCount > 0) {
-          showToast(`Đã đồng bộ ${addedCount} công việc từ Telegram!`, "success");
+          const msg = `Đã đồng bộ ${addedCount} công việc từ Telegram!`;
+          showToast(msg, "success");
+          addNotification("Đồng bộ Telegram", msg, "success");
         } else if (!isSilent) {
           showToast("Có tin nhắn nhưng AI không nhận dạng được lịch.", "info");
         }
@@ -630,7 +632,10 @@ const App: React.FC = () => {
       }
     } catch (e) {
       console.error("Sync error", e);
-      if (!isSilent) showToast("Lỗi kết nối Telegram (Many Requests?).", "error");
+      if (!isSilent) {
+        showToast("Lỗi kết nối Telegram (Many Requests?).", "error");
+        addNotification("Lỗi Đồng bộ", "Không thể kết nối Telegram. Vui lòng thử lại sau.", "error");
+      }
     } finally {
       if (!isSilent) setIsSyncing(false);
     }
@@ -683,7 +688,12 @@ const App: React.FC = () => {
         isDarkMode={isDarkMode} toggleTheme={() => setIsDarkMode(!isDarkMode)} setIsSettingsOpen={setIsSettingsOpen}
         onLogout={() => { if (isOfflineMode) window.location.reload(); else logOut(); }}
         datePickerRef={datePickerRef} searchInputRef={searchInputRef} isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen}
-        deferredPrompt={deferredPrompt} onInstallApp={handleInstallClick}
+        deferredPrompt={deferredPrompt}
+        onInstallApp={handleInstallClick}
+        notifications={notifications}
+        onMarkAllNotificationsAsRead={markAllNotificationsAsRead}
+        onClearAllNotifications={clearAllNotifications}
+        onMarkNotificationAsRead={markNotificationAsRead}
       />
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">

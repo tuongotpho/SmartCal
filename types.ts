@@ -15,20 +15,20 @@ export interface Subtask {
 
 export interface Task {
   id: string;
-  userId?: string; 
+  userId?: string;
   title: string;
   date: string; // Format: YYYY-MM-DD 
-  endDate?: string; 
+  endDate?: string;
   time: string; // Format: HH:mm
-  duration?: string; 
+  duration?: string;
   description?: string;
   completed: boolean;
   reminderSent?: boolean;
   recurringType?: RecurringType;
-  isRecurring?: boolean; 
-  tags: string[]; 
-  color?: string; 
-  subtasks?: Subtask[]; 
+  isRecurring?: boolean;
+  tags: string[];
+  color?: string;
+  subtasks?: Subtask[];
   customStatus?: 'todo' | 'in_progress' | 'done';
   pomodoroSessions?: number; // Số phiên làm việc đã thực hiện
 }
@@ -53,6 +53,15 @@ export interface AppTheme {
   name: string;
   label: string;
   colors: Record<number, string>; // 50, 100, ... 950 -> RGB String "r g b"
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  time: string; // ISO string
+  read: boolean;
+  type: 'info' | 'success' | 'warning' | 'error';
 }
 
 export const COLOR_PALETTES: Record<string, { color: string, dot: string, label: string }> = {
