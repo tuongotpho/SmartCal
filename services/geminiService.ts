@@ -51,7 +51,19 @@ const checkLocalConflicts = (proposedTask: Partial<Task>, existingTasks: Task[])
   return localConflicts;
 };
 
-export const parseTaskWithGemini = async (input: string, availableTags: string[]): Promise<{ title: string; date: string; endDate: string; time: string; duration: string; description: string; recurringType: string; tags: string[] } | null> => {
+// Interface cho kết quả trả về từ AI
+export interface ParsedTaskData {
+  title: string;
+  date: string;
+  endDate: string;
+  time: string;
+  duration: string;
+  description: string;
+  recurringType: string;
+  tags: string[];
+}
+
+export const parseTaskWithGemini = async (input: string, availableTags: string[]): Promise<ParsedTaskData[] | null> => {
   const ai = getAiInstance();
   if (!ai) {
     console.warn("Gemini API key chưa được cấu hình. Vào Cài đặt để nhập API key.");
@@ -64,30 +76,38 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Phân tích: "${input}". Hôm nay: ${today}. Trả về JSON lịch việc.`,
+      contents: `Phân tích: "${input}". Hôm nay: ${today}. Trả về JSON ARRAY danh sách các công việc được trích xuất.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            date: { type: Type.STRING },
-            endDate: { type: Type.STRING },
-            time: { type: Type.STRING },
-            duration: { type: Type.STRING },
-            description: { type: Type.STRING },
-            recurringType: { type: Type.STRING, enum: ['none', 'daily', 'weekly', 'monthly', 'yearly'] },
-            tags: { type: Type.ARRAY, items: { type: Type.STRING, enum: tagsToUse } }
-          },
-          required: ["title", "date", "time"]
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              date: { type: Type.STRING },
+              endDate: { type: Type.STRING },
+              time: { type: Type.STRING },
+              duration: { type: Type.STRING },
+              description: { type: Type.STRING },
+              recurringType: { type: Type.STRING, enum: ['none', 'daily', 'weekly', 'monthly', 'yearly'] },
+              tags: { type: Type.ARRAY, items: { type: Type.STRING, enum: tagsToUse } }
+            },
+            required: ["title", "date", "time"]
+          }
         }
       }
     });
 
     if (response.text) {
       const data = JSON.parse(response.text.trim());
-      if (!data.endDate) data.endDate = data.date;
-      return data;
+      // Đảm bảo kết quả là mảng
+      const tasks = Array.isArray(data) ? data : [data];
+      
+      return tasks.map((t: any) => ({
+        ...t,
+        endDate: t.endDate || t.date // Fallback endDate nếu thiếu
+      }));
     }
     return null;
   } catch (error) {

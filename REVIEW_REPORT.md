@@ -275,3 +275,54 @@ interface SharedTask extends Task {
 ---
 
 *Báo cáo được tạo tự động bởi AI Code Review*
+
+---
+
+## 7. CHI TIẾT RÀ SOÁT TÍNH NĂNG THÔNG BÁO (MỚI)
+
+**Ngày rà soát:** 20/02/2026
+
+### 7.1 Hiện trạng triển khai
+Hệ thống hiện tại đang sử dụng song song 2 cơ chế thông báo:
+1. **Browser Notification (Local):**
+   - Sử dụng `new Notification()` trực tiếp trong `App.tsx` (dòng 248).
+   - Dùng để nhắc việc khi ứng dụng đang mở (Foreground).
+
+2. **Web Push Notification (FCM):**
+   - Backend (`functions/src/index.ts`) đã có logic gửi FCM message (cron job 6:00 AM & realtime check).
+   - Client (`services/fcmService.ts`) đã có logic xin quyền, lấy token và lưu vào Firestore.
+   - Service Worker (`public/firebase-messaging-sw.js`) đã được tạo để xử lý background message.
+
+### 7.2 Vấn đề phát hiện
+1. **Xung đột Service Worker (Quan trọng):**
+   - `index.html` đăng ký `/sw.js` (Caching SW).
+   - Firebase SDK (`fcmService.ts`) mặc định sẽ thử đăng ký `/firebase-messaging-sw.js`.
+   - **Hệ quả:** Trình duyệt có thể chỉ chạy 1 trong 2 SW trên cùng scope root (`/`), dẫn đến việc **Caching hoạt động nhưng Push không nhận được** (hoặc ngược lại).
+   
+2. **Logic FCM chưa hoàn thiện:**
+   - Trong `fcmService.ts`, hàm `getToken` được gọi mà không truyền `serviceWorkerRegistration`. Điều này khiến Firebase tự tạo registration riêng cho `firebase-messaging-sw.js`, gây xung đột với `sw.js` hiện có.
+
+3. **Backend Logic:**
+   - Cloud Functions đang gửi message với payload có cả `notification` và `data` fields. Điều này tốt, nhưng cần đảm bảo SW xử lý đúng `onBackgroundMessage`.
+
+### 7.3 Đề xuất cải thiện (Action Plan)
+Để tính năng Web Push hoạt động ổn định, cần thực hiện:
+
+1. **Merge Service Workers:**
+   - Tích hợp code từ `firebase-messaging-sw.js` vào `sw.js`.
+   - Chỉ đăng ký duy nhất `sw.js` trong `index.html`.
+   - Cập nhật `fcmService.ts` để sử dụng SW registration đã có:
+     ```typescript
+     const registration = await navigator.serviceWorker.ready;
+     const token = await getToken(messaging, { 
+       vapidKey: VAPID_KEY,
+       serviceWorkerRegistration: registration 
+     });
+     ```
+
+2. **Kiểm tra UX xin quyền:**
+   - Hiện tại `App.tsx` xin quyền ngay khi load app (`Notification.requestPermission()`). Nên chuyển sang kích hoạt bằng hành động người dùng (nút "Bật thông báo") để tránh bị chặn tự động bởi trình duyệt.
+
+3. **Xử lý Click thông báo:**
+   - `sw.js` (hoặc `firebase-messaging-sw.js`) cần xử lý sự kiện `notificationclick` để focus vào tab đang mở thay vì luôn mở cửa sổ mới (đã có code xử lý này trong `firebase-messaging-sw.js` nhưng cần đảm bảo nó được chạy).
+
