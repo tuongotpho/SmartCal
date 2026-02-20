@@ -399,28 +399,28 @@ const App: React.FC = () => {
 
     if (skipCheck) {
       await saveTaskToDatabase(task);
-      return;
+    } else {
+      // AI Check Conflict BEFORE adding
+      const conflictList = await checkProposedTaskConflict(task, tasks);
+      if (conflictList.length > 0) {
+        setPendingConflicts(conflictList);
+        setProposedTask(task);
+        setIsConflictModalOpen(true);
+        hapticFeedback.warning();
+        return; // Don't proceed to save or notify if conflict exists
+      }
+      await saveTaskToDatabase(task);
     }
 
-    // AI Check Conflict BEFORE adding
-    const conflictList = await checkProposedTaskConflict(task, tasks);
-    if (conflictList.length > 0) {
-      setPendingConflicts(conflictList);
-      setProposedTask(task);
-      setIsConflictModalOpen(true);
-      hapticFeedback.warning();
-    } else {
-      await saveTaskToDatabase(task);
-
-      // Gửi thông báo Telegram khi tạo mới (nếu có config)
-      if (task.id === 'temp' && telegramConfig.botToken && telegramConfig.chatId) {
-        try {
-          const msg = formatNewTaskForTelegram(task);
-          await sendTelegramMessage(telegramConfig, msg);
-          console.log("Sent Telegram notification for new task:", task.title);
-        } catch (error) {
-          console.error("Failed to send creation notification to Telegram", error);
-        }
+    // Gửi thông báo Telegram khi tạo mới (nếu có config)
+    // Chạy cho cả trường hợp skipCheck (Import từ Telegram/QuickAdd) và normal add
+    if (task.id === 'temp' && telegramConfig.botToken && telegramConfig.chatId) {
+      try {
+        const msg = formatNewTaskForTelegram(task);
+        await sendTelegramMessage(telegramConfig, msg);
+        console.log("Sent Telegram notification for new task:", task.title);
+      } catch (error) {
+        console.error("Failed to send creation notification to Telegram", error);
       }
     }
   }, [tasks, saveTaskToDatabase]);
@@ -512,9 +512,17 @@ const App: React.FC = () => {
   // ==========================================
   // MANUAL SYNC: FETCH FROM TELEGRAM -> ADD TASKS
   // ==========================================
-  const handleManualSync = async () => {
-    if (!telegramConfig.botToken) return;
-    setIsSyncing(true);
+  const handleManualSync = useCallback(async (isSilent = false) => {
+    if (!telegramConfig.botToken) {
+      if (!isSilent) showToast("Chưa cấu hình Bot Token", "warning");
+      return;
+    }
+
+    // Nếu đang sync thì thôi, tránh chồng chéo
+    if (isSyncing) return;
+
+    if (!isSilent) setIsSyncing(true);
+
     try {
       // 1. Lấy tin nhắn mới nhất (dựa trên offset)
       const updates = await fetchTelegramUpdates(telegramConfig, lastTelegramUpdateId + 1);
@@ -553,6 +561,7 @@ const App: React.FC = () => {
 
               console.log("Adding task from Telegram:", newTask.title);
               // Thêm vào DB (skip check conflict để import nhanh)
+              // NOTE: handleRequestAddTask đã được sửa để gửi thông báo lại vào Telegram
               await handleRequestAddTask(newTask, true);
               addedCount++;
             }
@@ -567,19 +576,30 @@ const App: React.FC = () => {
 
         if (addedCount > 0) {
           showToast(`Đã đồng bộ ${addedCount} công việc từ Telegram!`, "success");
-        } else {
+        } else if (!isSilent) {
           showToast("Có tin nhắn nhưng AI không nhận dạng được lịch.", "info");
         }
-      } else {
+      } else if (!isSilent) {
         showToast("Không có tin nhắn mới trên Telegram.", "info");
       }
     } catch (e) {
       console.error("Sync error", e);
-      showToast("Lỗi kết nối Telegram.", "error");
+      if (!isSilent) showToast("Lỗi kết nối Telegram.", "error");
     } finally {
-      setIsSyncing(false);
+      if (!isSilent) setIsSyncing(false);
     }
-  };
+  }, [telegramConfig, lastTelegramUpdateId, tags, handleRequestAddTask, showToast, isSyncing, user, isOfflineMode]);
+
+  // Auto-Sync Effect
+  useEffect(() => {
+    if (!telegramConfig.botToken || !telegramConfig.chatId) return;
+
+    const intervalId = setInterval(() => {
+      handleManualSync(true); // Silent sync
+    }, 60 * 1000); // 60 seconds
+
+    return () => clearInterval(intervalId);
+  }, [telegramConfig, handleManualSync]);
 
   const renderContent = () => {
     switch (viewMode) {
