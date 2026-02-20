@@ -164,7 +164,7 @@ const App: React.FC = () => {
     }
   });
 
-  const addNotification = useCallback((title: string, message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+  const addNotification = useCallback((title: string, message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info', withSound = true) => {
     const newNotif: AppNotification = {
       id: Date.now().toString() + Math.random().toString(),
       title,
@@ -178,6 +178,11 @@ const App: React.FC = () => {
       localStorage.setItem('notifications', JSON.stringify(updated));
       return updated;
     });
+
+    // Play Sound
+    if (withSound) {
+      soundService.play();
+    }
   }, []);
 
   const markAllNotificationsAsRead = useCallback(() => {
@@ -254,67 +259,14 @@ const App: React.FC = () => {
         const body = payload.notification.body || "";
 
         showToast(`${title}: ${body}`, 'info');
-        addNotification(title, body, 'info');
+        addNotification(title, body, 'info', true);
       }
     });
 
     return () => unsubscribe();
   }, [fcmConfig.enabled, showToast, addNotification]);
 
-  // ==========================================
-  // LOGIC NHẮC VIỆC & TELEGRAM (REALTIME)
-  // ==========================================
-  useEffect(() => {
-    if (!tasks || tasks.length === 0) return;
 
-    // Chạy kiểm tra mỗi 30 giây
-    const checkInterval = setInterval(async () => {
-      const now = new Date();
-
-      for (const task of tasks) {
-        // Bỏ qua nếu đã xong hoặc đã nhắc
-        if (task.completed || task.reminderSent) continue;
-
-        // Parse thời gian task
-        const taskDateTime = parseISO(`${task.date}T${task.time}`);
-        if (isNaN(taskDateTime.getTime())) continue;
-
-        const diffInMinutes = differenceInMinutes(taskDateTime, now);
-
-        // Điều kiện nhắc: Còn <= reminderMinutesBefore phút và chưa quá giờ
-        const shouldRemind = isSameDay(taskDateTime, now) &&
-          diffInMinutes <= reminderMinutesBefore &&
-          diffInMinutes > 0;
-
-        if (shouldRemind) {
-          // 1. Hiển thị Reminder Modal
-          setReminderTask(task);
-          setIsReminderModalOpen(true);
-
-          // 2. Gửi Browser Notification
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(`🔔 Sắp đến hạn: ${task.title}`, {
-              body: `${task.time} - ${task.description || 'Không có mô tả'}`,
-              icon: '/icon.png'
-            });
-          }
-
-          // 3. Gửi Telegram Message (Nếu có cấu hình)
-          if (telegramConfig.botToken && telegramConfig.chatId) {
-            const msg = formatTaskForTelegram(task);
-            await sendTelegramMessage(telegramConfig, msg);
-          }
-
-          // 4. Cập nhật flag reminderSent = true để không nhắc lại
-          const updatedTask = { ...task, reminderSent: true };
-          await handleUpdateTask(updatedTask, false);
-          console.log(`Đã gửi nhắc nhở cho task: ${task.title}`);
-        }
-      }
-    }, 30 * 1000); // 30 giây check 1 lần
-
-    return () => clearInterval(checkInterval);
-  }, [tasks, telegramConfig, reminderMinutesBefore]);
 
   // PWA Install Event Listener
   useEffect(() => {
@@ -462,16 +414,20 @@ const App: React.FC = () => {
 
     // Gửi thông báo Telegram khi tạo mới (nếu có config)
     // Chạy cho cả trường hợp skipCheck (Import từ Telegram/QuickAdd) và normal add
-    if (task.id === 'temp' && telegramConfig.botToken && telegramConfig.chatId) {
-      try {
-        const msg = formatNewTaskForTelegram(task);
-        await sendTelegramMessage(telegramConfig, msg);
-        console.log("Sent Telegram notification for new task:", task.title);
-      } catch (error) {
-        console.error("Failed to send creation notification to Telegram", error);
+    if (task.id === 'temp') {
+      addNotification("Tạo mới thành công", `Đã thêm công việc: ${task.title}`, "success");
+
+      if (telegramConfig.botToken && telegramConfig.chatId) {
+        try {
+          const msg = formatNewTaskForTelegram(task);
+          await sendTelegramMessage(telegramConfig, msg);
+          console.log("Sent Telegram notification for new task:", task.title);
+        } catch (error) {
+          console.error("Failed to send creation notification to Telegram", error);
+        }
       }
     }
-  }, [tasks, saveTaskToDatabase]);
+  }, [tasks, saveTaskToDatabase, addNotification]);
 
   const handleUpdateTask = useCallback(async (updatedTask: Task, notify = true) => {
     // Only check conflict for updates if time/date changed AND it's not just a reminder flag update
@@ -508,6 +464,68 @@ const App: React.FC = () => {
     }
   }, [tasks, useFirebase, isOfflineMode, showToast]);
 
+  // ==========================================
+  // LOGIC NHẮC VIỆC & TELEGRAM (REALTIME)
+  // ==========================================
+  useEffect(() => {
+    if (!tasks || tasks.length === 0) return;
+
+    // Chạy kiểm tra mỗi 30 giây
+    const checkInterval = setInterval(async () => {
+      const now = new Date();
+
+      for (const task of tasks) {
+        // Bỏ qua nếu đã xong hoặc đã nhắc
+        if (task.completed || task.reminderSent) continue;
+
+        // Parse thời gian task
+        const taskDateTime = parseISO(`${task.date}T${task.time}`);
+        if (isNaN(taskDateTime.getTime())) continue;
+
+        const diffInMinutes = differenceInMinutes(taskDateTime, now);
+
+        // Điều kiện nhắc: Còn <= reminderMinutesBefore phút và chưa quá giờ
+        const shouldRemind = isSameDay(taskDateTime, now) &&
+          diffInMinutes <= reminderMinutesBefore &&
+          diffInMinutes > 0;
+
+        if (shouldRemind) {
+          // 1. Hiển thị Reminder Modal & Notification Center
+          setReminderTask(task);
+          setIsReminderModalOpen(true);
+          // Don't play sound in addNotification here because ReminderModal handles looping sound
+          addNotification(
+            `Sắp đến hạn: ${task.title}`,
+            `${task.time} - ${task.description || 'Không có mô tả'}`,
+            'warning',
+            false
+          );
+
+          // 2. Gửi Browser Notification
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(`🔔 Sắp đến hạn: ${task.title}`, {
+              body: `${task.time} - ${task.description || 'Không có mô tả'}`,
+              icon: '/icon.png'
+            });
+          }
+
+          // 3. Gửi Telegram Message (Nếu có cấu hình)
+          if (telegramConfig.botToken && telegramConfig.chatId) {
+            const msg = formatTaskForTelegram(task);
+            await sendTelegramMessage(telegramConfig, msg);
+          }
+
+          // 4. Cập nhật flag reminderSent = true để không nhắc lại
+          const updatedTask = { ...task, reminderSent: true };
+          await handleUpdateTask(updatedTask, false);
+          console.log(`Đã gửi nhắc nhở cho task: ${task.title}`);
+        }
+      }
+    }, 30 * 1000); // 30 giây check 1 lần
+
+    return () => clearInterval(checkInterval);
+  }, [tasks, telegramConfig, reminderMinutesBefore, addNotification, handleUpdateTask]);
+
   const handleToggleComplete = useCallback(async (task: Task) => {
     const nextState = !task.completed;
     const updated = { ...task, completed: nextState };
@@ -517,8 +535,13 @@ const App: React.FC = () => {
       await updateTaskInFirestore(updated);
     }
 
-    if (nextState) { hapticFeedback.medium(); showToast(`Đã xong: ${task.title}`, "success"); }
-  }, [useFirebase, isOfflineMode, showToast]);
+    if (nextState) {
+      hapticFeedback.medium();
+      showToast(`Đã xong: ${task.title}`, "success");
+      // Notify completion
+      addNotification("Đã hoàn thành", `Chúc mừng bạn đã hoàn thành: ${task.title}`, "success", false); // No sound for completion, just helpful
+    }
+  }, [useFirebase, isOfflineMode, showToast, addNotification]);
 
   // Handler cho Reminder Modal
   const handleReminderClose = useCallback(() => {
@@ -532,20 +555,22 @@ const App: React.FC = () => {
       const updatedTask = { ...reminderTask, reminderSent: false };
       handleUpdateTask(updatedTask, false);
       showToast(`Sẽ nhắc lại sau ${minutes} phút`, "info");
+      addNotification("Hoãn nhắc nhở", `Đã hoãn việc "${reminderTask.title}" thêm ${minutes} phút.`, "info", false);
     }
     setIsReminderModalOpen(false);
     setReminderTask(null);
-  }, [reminderTask, handleUpdateTask, showToast]);
+  }, [reminderTask, handleUpdateTask, showToast, addNotification]);
 
   const handleReminderComplete = useCallback(async () => {
     if (reminderTask) {
       const updatedTask = { ...reminderTask, completed: true };
       await handleUpdateTask(updatedTask, false);
       showToast(`Đã hoàn thành: ${reminderTask.title}`, "success");
+      addNotification("Đã hoàn thành", `Chúc mừng bạn đã hoàn thành: ${reminderTask.title}`, "success");
     }
     setIsReminderModalOpen(false);
     setReminderTask(null);
-  }, [reminderTask, handleUpdateTask, showToast]);
+  }, [reminderTask, handleUpdateTask, showToast, addNotification]);
 
   const executeDeleteTask = useCallback(async () => {
     if (!taskToDeleteId) return;
@@ -553,9 +578,12 @@ const App: React.FC = () => {
       if (useFirebase && !isOfflineMode) await deleteTaskFromFirestore(taskToDeleteId);
       setTasks(prev => prev.filter(t => t.id !== taskToDeleteId));
       showToast("Đã xóa công việc", "info");
+
+      // Notify deletion
+      addNotification("Đã xóa", "Công việc đã được xóa khỏi danh sách.", "info", false);
     } catch (e) { showToast("Lỗi khi xóa.", "error"); }
     setTaskToDeleteId(null);
-  }, [taskToDeleteId, useFirebase, isOfflineMode, showToast]);
+  }, [taskToDeleteId, useFirebase, isOfflineMode, showToast, addNotification]);
 
   // ==========================================
   // MANUAL SYNC: FETCH FROM TELEGRAM -> ADD TASKS

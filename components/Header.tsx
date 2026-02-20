@@ -196,7 +196,9 @@ const Header: React.FC<HeaderProps> = ({
             >
               <Bell size={20} />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-primary-600 animate-pulse"></span>
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full border-2 border-primary-600 flex items-center justify-center text-[10px] font-bold animate-pulse">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
               )}
             </button>
             {isNotifOpen && (
