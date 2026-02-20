@@ -156,6 +156,8 @@ const App: React.FC = () => {
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [proposedTask, setProposedTask] = useState<Task | null>(null);
   const [pendingConflicts, setPendingConflicts] = useState<string[]>([]);
+  // AI Assistant open state (for mobile nav)
+  const [isAIOpen, setIsAIOpen] = useState(false);
 
   const [telegramConfig, setTelegramConfig] = useState<TelegramConfig>(() => {
     try {
@@ -759,10 +761,10 @@ const App: React.FC = () => {
           <Sidebar onAddTask={handleRequestAddTask} onGenerateReport={() => { setIsReportLoading(true); generateReport(tasks, "Tháng").then(r => { setAiReport(r); setIsReportLoading(false); }); }} isReportLoading={isReportLoading} aiReport={aiReport} tags={tags} user={user} isOfflineMode={isOfflineMode} isDarkMode={isDarkMode} showToast={showToast} />
         </aside>
 
-        <MobileNavigation viewMode={viewMode} setViewMode={setViewMode} onCreateNewTask={() => { setEditingTask({ id: 'temp', title: '', date: format(new Date(), 'yyyy-MM-dd'), time: '08:00', completed: false, tags: ['Khác'] }); setIsEditModalOpen(true); }} onOpenSettings={() => setIsSettingsOpen(true)} />
+        <MobileNavigation viewMode={viewMode} setViewMode={setViewMode} onCreateNewTask={() => { setEditingTask({ id: 'temp', title: '', date: format(new Date(), 'yyyy-MM-dd'), time: '08:00', completed: false, tags: ['Khác'] }); setIsEditModalOpen(true); }} onOpenSettings={() => setIsSettingsOpen(true)} onOpenAI={() => setIsAIOpen(true)} />
       </div>
 
-      <AiAssistant tasks={tasks} />
+      <AiAssistant tasks={tasks} externalOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />
 
       <SettingsModal
         isOpen={isSettingsOpen}
