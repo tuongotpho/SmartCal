@@ -248,14 +248,18 @@ const App: React.FC = () => {
     const unsubscribe = onForegroundMessage((payload) => {
       console.log("Received FCM message:", payload);
 
-      // Show toast notification
+      // Show toast notification & Add to Notification Center
       if (payload.notification) {
-        showToast(`${payload.notification.title}: ${payload.notification.body}`, 'info');
+        const title = payload.notification.title || "Thông báo mới";
+        const body = payload.notification.body || "";
+
+        showToast(`${title}: ${body}`, 'info');
+        addNotification(title, body, 'info');
       }
     });
 
     return () => unsubscribe();
-  }, [fcmConfig.enabled, showToast]);
+  }, [fcmConfig.enabled, showToast, addNotification]);
 
   // ==========================================
   // LOGIC NHẮC VIỆC & TELEGRAM (REALTIME)
