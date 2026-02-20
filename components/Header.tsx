@@ -1,23 +1,26 @@
 
-import React, { useRef } from 'react';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  ChevronDown, 
-  Search, 
-  X, 
-  Sun, 
-  Moon, 
-  Settings, 
-  LogOut, 
+import React, { useRef, useState } from 'react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Search,
+  X,
+  Sun,
+  Moon,
+  Settings,
+  LogOut,
   User,
   PanelRightClose,
   PanelRightOpen,
-  Download
+  Download,
+  Bell
 } from 'lucide-react';
 import { format } from 'date-fns';
 import DatePickerPopover from './DatePickerPopover';
+import NotificationPopover from './NotificationPopover';
 import { ToastType } from './Toast';
+import { AppNotification } from '../types';
 
 interface HeaderProps {
   currentDate: Date;
@@ -41,10 +44,16 @@ interface HeaderProps {
   searchInputRef: React.RefObject<HTMLInputElement>;
   isSidebarOpen: boolean;
   setIsSidebarOpen: (open: boolean) => void;
-  
+
   // PWA Props
   deferredPrompt?: any;
   onInstallApp?: () => void;
+
+  // Notification Props
+  notifications: AppNotification[];
+  onMarkAllNotificationsAsRead: () => void;
+  onClearAllNotifications: () => void;
+  onMarkNotificationAsRead: (id: string) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -70,126 +79,155 @@ const Header: React.FC<HeaderProps> = ({
   isSidebarOpen,
   setIsSidebarOpen,
   deferredPrompt,
-  onInstallApp
+  onInstallApp,
+  notifications,
+  onMarkAllNotificationsAsRead,
+  onClearAllNotifications,
+  onMarkNotificationAsRead
 }) => {
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const unreadCount = notifications.filter(n => !n.read).length;
+
   return (
     <div className="bg-gradient-to-r from-primary-500/95 to-primary-700/95 backdrop-blur-md text-white px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] shadow-md z-30 flex-shrink-0 sticky top-0 transition-all">
       <div className="flex justify-between items-center px-1 lg:px-4">
         <div className="flex items-center gap-2">
           <div className="hidden sm:block">
-            <img 
-               src="https://raw.githubusercontent.com/thanhlv87/pic/refs/heads/main/august2.png" 
-               alt="SmartCal Logo" 
-               className="w-9 h-9 object-contain drop-shadow-sm"
+            <img
+              src="https://raw.githubusercontent.com/thanhlv87/pic/refs/heads/main/august2.png"
+              alt="SmartCal Logo"
+              className="w-9 h-9 object-contain drop-shadow-sm"
             />
           </div>
           <h1 className="text-lg font-bold tracking-tight">SmartCal <span className="hidden sm:inline-block text-xs font-light opacity-80 bg-white/10 px-1 rounded">PRO</span></h1>
         </div>
-        
+
         <div className="flex items-center gap-1 sm:gap-2 text-sm font-medium">
-           <button onClick={onPrev} className="hover:bg-white/20 p-1.5 rounded-full transition active:scale-90"><ChevronLeft size={20} /></button>
-           
-           {/* Date Picker & Search Trigger */}
-           <div className="flex items-center gap-1">
-             {/* Search Input */}
-              <div className={`transition-all duration-300 overflow-hidden flex items-center ${isSearchActive ? 'w-32 sm:w-48 bg-white/20 rounded-md' : 'w-0'}`}>
-                  <input 
-                    ref={searchInputRef}
-                    type="text" 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onBlur={() => !searchQuery && setIsSearchActive(false)}
-                    placeholder="Tìm kiếm..."
-                    className="w-full bg-transparent border-none outline-none text-white text-xs px-2 py-1 placeholder-white/50"
-                  />
-                  {searchQuery && (
-                      <button onClick={() => setSearchQuery("")} className="p-1 hover:text-red-200"><X size={12}/></button>
-                  )}
-              </div>
+          <button onClick={onPrev} className="hover:bg-white/20 p-1.5 rounded-full transition active:scale-90"><ChevronLeft size={20} /></button>
 
-              {!isSearchActive && (
-                  <button onClick={() => setIsSearchActive(true)} className="p-1.5 hover:bg-white/20 rounded-full transition active:scale-95">
-                      <Search size={18} />
-                  </button>
+          {/* Date Picker & Search Trigger */}
+          <div className="flex items-center gap-1">
+            {/* Search Input */}
+            <div className={`transition-all duration-300 overflow-hidden flex items-center ${isSearchActive ? 'w-32 sm:w-48 bg-white/20 rounded-md' : 'w-0'}`}>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onBlur={() => !searchQuery && setIsSearchActive(false)}
+                placeholder="Tìm kiếm..."
+                className="w-full bg-transparent border-none outline-none text-white text-xs px-2 py-1 placeholder-white/50"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery("")} className="p-1 hover:text-red-200"><X size={12} /></button>
               )}
+            </div>
 
-             <div className="relative" ref={datePickerRef}>
-                <button 
-                  onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                  className="min-w-[80px] sm:min-w-[140px] flex items-center justify-center gap-1 text-sm sm:text-base font-bold bg-white/10 px-2 py-1 rounded-md border border-white/20 shadow-sm backdrop-blur-sm hover:bg-white/20 transition active:scale-95 cursor-pointer"
-                >
-                  <span className="hidden sm:inline">{getHeaderText}</span>
-                  <span className="sm:hidden">{format(currentDate, 'dd/MM')}</span>
-                   <ChevronDown size={14} className="opacity-70" />
-                </button>
-                
-                {isDatePickerOpen && (
-                  <DatePickerPopover 
-                    currentDate={currentDate}
-                    onDateSelect={(date) => {
-                      setCurrentDate(date);
-                      setIsDatePickerOpen(false);
-                    }}
-                    onClose={() => setIsDatePickerOpen(false)}
-                  />
-                )}
-              </div>
-           </div>
+            {!isSearchActive && (
+              <button onClick={() => setIsSearchActive(true)} className="p-1.5 hover:bg-white/20 rounded-full transition active:scale-95">
+                <Search size={18} />
+              </button>
+            )}
 
-           <button onClick={onNext} className="hover:bg-white/20 p-1.5 rounded-full transition active:scale-90"><ChevronRight size={20} /></button>
+            <div className="relative" ref={datePickerRef}>
+              <button
+                onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+                className="min-w-[80px] sm:min-w-[140px] flex items-center justify-center gap-1 text-sm sm:text-base font-bold bg-white/10 px-2 py-1 rounded-md border border-white/20 shadow-sm backdrop-blur-sm hover:bg-white/20 transition active:scale-95 cursor-pointer"
+              >
+                <span className="hidden sm:inline">{getHeaderText}</span>
+                <span className="sm:hidden">{format(currentDate, 'dd/MM')}</span>
+                <ChevronDown size={14} className="opacity-70" />
+              </button>
+
+              {isDatePickerOpen && (
+                <DatePickerPopover
+                  currentDate={currentDate}
+                  onDateSelect={(date) => {
+                    setCurrentDate(date);
+                    setIsDatePickerOpen(false);
+                  }}
+                  onClose={() => setIsDatePickerOpen(false)}
+                />
+              )}
+            </div>
+          </div>
+
+          <button onClick={onNext} className="hover:bg-white/20 p-1.5 rounded-full transition active:scale-90"><ChevronRight size={20} /></button>
         </div>
 
         <div className="flex gap-2 sm:gap-3 items-center">
-           {/* Install App Button (Desktop PWA) */}
-           {deferredPrompt && (
-              <button 
-                 onClick={onInstallApp}
-                 className="hidden lg:flex items-center gap-1 bg-white text-primary-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-md animate-pulse hover:bg-gray-100 transition"
-                 title="Cài đặt ứng dụng vào máy tính"
-              >
-                 <Download size={14} /> Cài đặt App
-              </button>
-           )}
+          {/* Install App Button (Desktop PWA) */}
+          {deferredPrompt && (
+            <button
+              onClick={onInstallApp}
+              className="hidden lg:flex items-center gap-1 bg-white text-primary-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-md animate-pulse hover:bg-gray-100 transition"
+              title="Cài đặt ứng dụng vào máy tính"
+            >
+              <Download size={14} /> Cài đặt App
+            </button>
+          )}
 
-           {/* User Info / Logout (Desktop) */}
-           <div className="hidden lg:flex items-center gap-2 mr-2 border-r border-white/20 pr-3">
-              {user?.photoURL ? (
-                <img src={user.photoURL} alt="User" className="w-6 h-6 rounded-full border border-white/50" />
-              ) : (
-                <User size={20} />
-              )}
-              <span className="text-xs font-medium max-w-[80px] truncate">
-                {user?.displayName || (isOfflineMode ? 'Offline' : 'User')}
-              </span>
-           </div>
+          {/* User Info / Logout (Desktop) */}
+          <div className="hidden lg:flex items-center gap-2 mr-2 border-r border-white/20 pr-3">
+            {user?.photoURL ? (
+              <img src={user.photoURL} alt="User" className="w-6 h-6 rounded-full border border-white/50" />
+            ) : (
+              <User size={20} />
+            )}
+            <span className="text-xs font-medium max-w-[80px] truncate">
+              {user?.displayName || (isOfflineMode ? 'Offline' : 'User')}
+            </span>
+          </div>
 
           {/* Dark Mode Toggle */}
-           <button 
-              onClick={toggleTheme} 
-              className="hover:bg-white/20 p-2 rounded-full transition text-xs font-semibold backdrop-blur-sm active:scale-95"
-              title="Chuyển chế độ Sáng/Tối"
-           >
-             {isDarkMode ? <Sun size={20} className="text-yellow-300" /> : <Moon size={20} className="text-white" />}
-           </button>
+          <button
+            onClick={toggleTheme}
+            className="hover:bg-white/20 p-2 rounded-full transition text-xs font-semibold backdrop-blur-sm active:scale-95"
+            title="Chuyển chế độ Sáng/Tối"
+          >
+            {isDarkMode ? <Sun size={20} className="text-yellow-300" /> : <Moon size={20} className="text-white" />}
+          </button>
 
-           {/* Settings Button */}
+          {/* Notification Bell */}
+          <div className="relative">
+            <button
+              onClick={() => setIsNotifOpen(!isNotifOpen)}
+              className="hover:bg-white/20 p-2 rounded-full transition text-xs font-semibold backdrop-blur-sm active:scale-95 relative"
+            >
+              <Bell size={20} />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-primary-600 animate-pulse"></span>
+              )}
+            </button>
+            {isNotifOpen && (
+              <NotificationPopover
+                notifications={notifications}
+                onClose={() => setIsNotifOpen(false)}
+                onMarkAllAsRead={onMarkAllNotificationsAsRead}
+                onClearAll={onClearAllNotifications}
+                onMarkAsRead={onMarkNotificationAsRead}
+              />
+            )}
+          </div>
+
+          {/* Settings Button */}
           <button onClick={() => setIsSettingsOpen(true)} className="hidden lg:flex items-center gap-1 hover:bg-white/20 px-2 py-1.5 rounded-md transition text-xs font-semibold backdrop-blur-sm active:scale-95">
             <Settings size={20} /> <span className="hidden sm:inline">Cài đặt</span>
           </button>
-          
+
           {/* Toggle Sidebar (New) */}
-          <button 
-             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-             className="hidden lg:flex hover:bg-white/20 p-2 rounded-full transition text-xs font-semibold backdrop-blur-sm active:scale-95"
-             title={isSidebarOpen ? "Ẩn thanh công cụ" : "Hiện thanh công cụ"}
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="hidden lg:flex hover:bg-white/20 p-2 rounded-full transition text-xs font-semibold backdrop-blur-sm active:scale-95"
+            title={isSidebarOpen ? "Ẩn thanh công cụ" : "Hiện thanh công cụ"}
           >
-             {isSidebarOpen ? <PanelRightClose size={20} /> : <PanelRightOpen size={20} />}
+            {isSidebarOpen ? <PanelRightClose size={20} /> : <PanelRightOpen size={20} />}
           </button>
 
           {/* Logout Button */}
-          <button 
-            onClick={onLogout} 
-            className="hover:bg-white/20 p-2 rounded-full transition text-xs font-semibold backdrop-blur-sm active:scale-95" 
+          <button
+            onClick={onLogout}
+            className="hover:bg-white/20 p-2 rounded-full transition text-xs font-semibold backdrop-blur-sm active:scale-95"
             title={isOfflineMode ? "Thoát chế độ Offline" : "Đăng xuất"}
           >
             <LogOut size={20} />

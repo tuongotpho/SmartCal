@@ -51,7 +51,7 @@ import TimelineView from './components/TimelineView';
 import FocusView from './components/FocusView';
 import ReminderModal from './components/ReminderModal';
 
-import { Task, TelegramConfig, ViewMode, Tag, DEFAULT_TASK_TAGS, RecurringType, AppTheme } from './types';
+import { Task, TelegramConfig, ViewMode, Tag, DEFAULT_TASK_TAGS, RecurringType, AppTheme, AppNotification } from './types';
 import { parseTaskWithGemini, generateReport, checkProposedTaskConflict } from './services/geminiService';
 import { sendTelegramMessage, fetchTelegramUpdates, formatTaskForTelegram, formatNewTaskForTelegram } from './services/telegramService';
 import { subscribeToTasks, subscribeToTags, saveTagsToFirestore, addTaskToFirestore, deleteTaskFromFirestore, updateTaskInFirestore, auth, logOut, saveTelegramConfigToFirestore } from './services/firebase';
@@ -118,6 +118,13 @@ const App: React.FC = () => {
   const [aiReport, setAiReport] = useState<string | null>(null);
   const [useFirebase, setUseFirebase] = useState(true);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
+    try {
+      const saved = localStorage.getItem('notifications');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastTelegramUpdateId, setLastTelegramUpdateId] = useState<number>(() => {
     return parseInt(localStorage.getItem('lastTelegramUpdateId') || '0');
@@ -156,6 +163,43 @@ const App: React.FC = () => {
       return { botToken: '', chatId: '' };
     }
   });
+
+  const addNotification = useCallback((title: string, message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+    const newNotif: AppNotification = {
+      id: Date.now().toString() + Math.random().toString(),
+      title,
+      message,
+      time: new Date().toISOString(),
+      read: false,
+      type
+    };
+    setNotifications(prev => {
+      const updated = [newNotif, ...prev].slice(0, 50); // Keep last 50
+      localStorage.setItem('notifications', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const markAllNotificationsAsRead = useCallback(() => {
+    setNotifications(prev => {
+      const updated = prev.map(n => ({ ...n, read: true }));
+      localStorage.setItem('notifications', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const clearAllNotifications = useCallback(() => {
+    setNotifications([]);
+    localStorage.setItem('notifications', JSON.stringify([]));
+  }, []);
+
+  const markNotificationAsRead = useCallback((id: string) => {
+    setNotifications(prev => {
+      const updated = prev.map(n => n.id === id ? { ...n, read: true } : n);
+      localStorage.setItem('notifications', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
     const id = Date.now().toString() + Math.random().toString();

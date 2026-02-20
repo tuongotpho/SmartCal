@@ -3,7 +3,7 @@
  */
 
 // Âm thanh chuông mặc định (base64 encoded MP3)
-const DEFAULT_BELL_SOUND = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYNFCCtAAAAAAD/+1DEAAAFoANoAAAAACKgA1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/7UMQeAAi0A2gAAAAAAACAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/+1DEQAAAAAH/AAAAAAAANIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
+const DEFAULT_BELL_SOUND = 'data:audio/mp3;base64,//uQxAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//uQxAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
 
 class SoundService {
   private audio: HTMLAudioElement | null = null;
@@ -22,13 +22,13 @@ class SoundService {
    */
   play = (): void => {
     if (!this.isEnabled) return;
-    
+
     try {
       if (!this.audio) {
         this.audio = new Audio(DEFAULT_BELL_SOUND);
         this.audio.volume = 0.7;
       }
-      
+
       // Reset và phát
       this.audio.currentTime = 0;
       this.audio.play().catch(err => {
@@ -44,7 +44,7 @@ class SoundService {
    */
   playRepeat = (times: number = 3, interval: number = 500): void => {
     if (!this.isEnabled) return;
-    
+
     let count = 0;
     const playInterval = setInterval(() => {
       this.play();
@@ -62,7 +62,7 @@ class SoundService {
     this.isEnabled = true;
     try {
       localStorage.setItem('reminder_sound_enabled', 'true');
-    } catch {}
+    } catch { }
   };
 
   /**
@@ -72,7 +72,7 @@ class SoundService {
     this.isEnabled = false;
     try {
       localStorage.setItem('reminder_sound_enabled', 'false');
-    } catch {}
+    } catch { }
   };
 
   /**
