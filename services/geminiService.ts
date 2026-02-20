@@ -2,12 +2,35 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Task } from "../types";
 
-// Sử dụng import.meta.env cho Vite (browser environment)
-// @ts-ignore - Vite injects this at build time
-const GEMINI_API_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || "";
+// Lấy API key từ localStorage (người dùng tự nhập trong Settings)
+const getGeminiApiKey = (): string => {
+  try {
+    return localStorage.getItem('gemini_api_key') || "";
+  } catch {
+    return "";
+  }
+};
 
-// Khởi tạo AI chỉ khi có API key
-const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
+// Lưu API key vào localStorage
+export const saveGeminiApiKey = (apiKey: string): void => {
+  try {
+    localStorage.setItem('gemini_api_key', apiKey);
+  } catch (e) {
+    console.error("Error saving Gemini API key:", e);
+  }
+};
+
+// Kiểm tra đã cấu hình API key chưa
+export const hasGeminiApiKey = (): boolean => {
+  return !!getGeminiApiKey();
+};
+
+// Khởi tạo AI instance với API key từ localStorage
+const getAiInstance = (): GoogleGenAI | null => {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) return null;
+  return new GoogleGenAI({ apiKey });
+};
 
 /**
  * Kiểm tra nhanh trùng giờ tuyệt đối bằng code (Local)
@@ -29,8 +52,9 @@ const checkLocalConflicts = (proposedTask: Partial<Task>, existingTasks: Task[])
 };
 
 export const parseTaskWithGemini = async (input: string, availableTags: string[]): Promise<{ title: string; date: string; endDate: string; time: string; duration: string; description: string; recurringType: string; tags: string[] } | null> => {
+  const ai = getAiInstance();
   if (!ai) {
-    console.warn("Gemini API key not configured");
+    console.warn("Gemini API key chưa được cấu hình. Vào Cài đặt để nhập API key.");
     return null;
   }
   
@@ -81,6 +105,7 @@ export const checkProposedTaskConflict = async (proposedTask: Partial<Task>, exi
   if (local.length > 0) return local;
 
   // BƯỚC 2: Gọi AI kiểm tra các xung đột phức tạp hơn (quá sát giờ)
+  const ai = getAiInstance();
   if (!ai) return [];
   
   try {
@@ -107,6 +132,7 @@ export const checkProposedTaskConflict = async (proposedTask: Partial<Task>, exi
 };
 
 export const analyzeScheduleConflicts = async (tasks: Task[]): Promise<string[]> => {
+  const ai = getAiInstance();
   if (!ai) return [];
   
   try {
@@ -129,6 +155,7 @@ export const analyzeScheduleConflicts = async (tasks: Task[]): Promise<string[]>
 };
 
 export const suggestSubtasks = async (taskTitle: string, taskDescription?: string): Promise<string[]> => {
+  const ai = getAiInstance();
   if (!ai) return [];
   
   try {
@@ -147,7 +174,8 @@ export const suggestSubtasks = async (taskTitle: string, taskDescription?: strin
 };
 
 export const generateReport = async (tasks: Task[], range: string): Promise<string> => {
-  if (!ai) return "Chưa cấu hình Gemini API key.";
+  const ai = getAiInstance();
+  if (!ai) return "Chưa cấu hình Gemini API key. Vào Cài đặt > Cấu hình chung để nhập API key.";
   
   try {
     const tasksData = tasks.map(t => ({ title: t.title, date: t.date, status: t.completed ? "Xong" : "Chưa" }));
@@ -162,7 +190,8 @@ export const generateReport = async (tasks: Task[], range: string): Promise<stri
 };
 
 export const chatWithCalendar = async (question: string, tasks: Task[]): Promise<string> => {
-  if (!ai) return "Chưa cấu hình Gemini API key.";
+  const ai = getAiInstance();
+  if (!ai) return "Chưa cấu hình Gemini API key. Vào Cài đặt > Cấu hình chung để nhập API key.";
   
   try {
     const simpleTasks = tasks.map(t => ({ title: t.title, date: t.date, time: t.time, status: t.completed ? "Xong" : "Chưa" }));

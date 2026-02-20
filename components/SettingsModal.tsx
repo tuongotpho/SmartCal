@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { TelegramConfig, Tag, COLOR_PALETTES, AppTheme } from '../types';
-import { X, Save, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Palette, Bell, BellOff } from 'lucide-react';
+import { X, Save, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Palette, Bell, BellOff, Key, Sparkles } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 import { ToastType } from './Toast';
 import { checkFCMSupport, initializeFCM, disableFCM, FCMConfig } from '../services/fcmService';
+import { saveGeminiApiKey, hasGeminiApiKey } from '../services/geminiService';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -60,6 +61,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // FCM State
   const [localFcmConfig, setLocalFcmConfig] = useState<FCMConfig>(fcmConfig || { enabled: false, token: null });
   const [isFCMLoading, setIsFCMLoading] = useState(false);
+
+  // Gemini API Key State
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
+    try {
+      return localStorage.getItem('gemini_api_key') || '';
+    } catch {
+      return '';
+    }
+  });
 
   // State cho Modal xác nhận xóa
   const [tagToDelete, setTagToDelete] = useState<string | null>(null);
@@ -180,13 +190,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           {activeTab === 'general' ? (
             <div className="space-y-6">
               
-              {/* Theme Selection */}
-              {themes && setCurrentTheme && (
-                 <div className="space-y-3">
-                   <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
-                    <Palette size={16} className="text-primary-500" /> Giao diện & Màu sắc
-                   </h3>
-                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+               {/* Theme Selection */}
+               {themes && setCurrentTheme && (
+                  <div className="space-y-3">
+                    <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
+                     <Palette size={16} className="text-primary-500" /> Giao diện & Màu sắc
+                    </h3>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                       {themes.map(t => (
                         <button
                           key={t.name}
@@ -199,7 +209,39 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       ))}
                    </div>
                  </div>
-              )}
+               )}
+
+              {/* Gemini API Key Section */}
+              <div className="space-y-3">
+                <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
+                  <Sparkles size={16} className="text-purple-500" /> Google Gemini AI
+                </h3>
+                <div className="bg-purple-50 dark:bg-purple-900/10 p-3 rounded-lg border border-purple-100 dark:border-purple-900/30">
+                  <div className="mb-2">
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">API Key</label>
+                    <input
+                      type="password"
+                      value={geminiApiKey}
+                      onChange={(e) => setGeminiApiKey(e.target.value)}
+                      placeholder="AIzaSy..."
+                      className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                      {geminiApiKey ? '✅ Đã cấu hình' : '⚠️ Chưa cấu hình - Tính năng AI sẽ không hoạt động'}
+                    </span>
+                    <a 
+                      href="https://aistudio.google.com/app/apikey" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline"
+                    >
+                      Lấy API Key miễn phí →
+                    </a>
+                  </div>
+                </div>
+              </div>
 
               <div className="space-y-4">
                 <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
@@ -388,6 +430,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             onClick={() => {
               onSaveConfig(config);
               onSaveTags(currentTags);
+              // Save Gemini API Key
+              saveGeminiApiKey(geminiApiKey);
               showToast("Đã lưu cấu hình", "success");
               onClose();
             }}
