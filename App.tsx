@@ -721,7 +721,11 @@ const App: React.FC = () => {
   };
 
   if (isAuthLoading) return <div className="flex h-screen items-center justify-center bg-primary-50 dark:bg-gray-950"><RefreshCw className="animate-spin text-primary-600" size={32} /></div>;
-  if (!user && !isOfflineMode) return <LoginScreen onBypassAuth={() => { setIsOfflineMode(true); setUseFirebase(false); }} />;
+
+  const isDesktopAuth = new URLSearchParams(window.location.search).get('desktop_auth') === 'true';
+  if ((!user && !isOfflineMode) || isDesktopAuth) {
+    return <LoginScreen onBypassAuth={() => { setIsOfflineMode(true); setUseFirebase(false); }} />;
+  }
 
   return (
     <div
