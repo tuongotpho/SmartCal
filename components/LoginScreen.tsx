@@ -24,6 +24,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
   const isDesktopApp = isTauri();
 
   const [showCopyToken, setShowCopyToken] = useState<string | null>(null);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   const handleLogin = async () => {
     setIsLoading(true);
@@ -221,7 +222,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(showCopyToken);
-                    alert("Đã copy thành công!");
                   } catch (e) {
                     const el = document.createElement("textarea");
                     el.value = showCopyToken;
@@ -229,13 +229,30 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
                     el.select();
                     document.execCommand("copy");
                     document.body.removeChild(el);
-                    alert("Đã copy thành công!");
                   }
+                  setTokenCopied(true);
                 }}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-95"
+                className={`w-full font-bold py-3 rounded-lg transition flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-95 ${tokenCopied
+                  ? 'bg-green-500 text-white'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
               >
-                📋 Copy Token
+                {tokenCopied ? '✅ Đã copy token!' : '📋 Copy Token'}
               </button>
+
+              {tokenCopied && (
+                <button
+                  onClick={() => {
+                    // Xóa param desktop_auth và chuyển sang trang chủ web app
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('desktop_auth');
+                    window.location.href = url.toString();
+                  }}
+                  className="w-full mt-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2 active:scale-95"
+                >
+                  🌐 Đóng và vào Web App
+                </button>
+              )}
             </div>
           </div>
         )}

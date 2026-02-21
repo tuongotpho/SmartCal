@@ -8,6 +8,7 @@ use tauri::{
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             // Tạo menu chuột phải cho System Tray
             let show_item = MenuItem::with_id(app, "show", "Mở SmartCal", true, None::<&str>)?;

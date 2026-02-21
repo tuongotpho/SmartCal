@@ -7,7 +7,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
-      external: ['@tauri-apps/plugin-shell', '@tauri-apps/api']
+      external: ['@tauri-apps/plugin-shell', '@tauri-apps/plugin-notification', '@tauri-apps/api']
     }
   },
   server: {

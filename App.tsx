@@ -221,9 +221,22 @@ const App: React.FC = () => {
 
   // Request Notification Permission on Load
   useEffect(() => {
-    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-      Notification.requestPermission();
-    }
+    const requestNotifPermission = async () => {
+      if ((window as any).__TAURI_INTERNALS__) {
+        // Tauri: dùng native notification plugin
+        try {
+          const pluginName = '@tauri-apps/plugin-notification';
+          const notif = await import(/* @vite-ignore */ pluginName);
+          const granted = await notif.isPermissionGranted();
+          if (!granted) await notif.requestPermission();
+        } catch (e) {
+          console.warn('Tauri notification plugin not available:', e);
+        }
+      } else if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
+    };
+    requestNotifPermission();
   }, []);
 
   // ==========================================
@@ -521,8 +534,19 @@ const App: React.FC = () => {
             false
           );
 
-          // 2. Gửi Browser Notification
-          if ('Notification' in window && Notification.permission === 'granted') {
+          // 2. Gửi Browser / Native Notification
+          if ((window as any).__TAURI_INTERNALS__) {
+            try {
+              const pluginName = '@tauri-apps/plugin-notification';
+              const notif = await import(/* @vite-ignore */ pluginName);
+              await notif.sendNotification({
+                title: `🔔 Sắp đến hạn: ${task.title}`,
+                body: `${task.time} - ${task.description || 'Không có mô tả'}`
+              });
+            } catch (e) {
+              console.warn('Tauri notification failed:', e);
+            }
+          } else if ('Notification' in window && Notification.permission === 'granted') {
             new Notification(`🔔 Sắp đến hạn: ${task.title}`, {
               body: `${task.time} - ${task.description || 'Không có mô tả'}`,
               icon: '/icon.png'
