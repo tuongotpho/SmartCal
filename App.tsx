@@ -400,22 +400,21 @@ const App: React.FC = () => {
           const taskDataForFirestore = { ...taskToSave };
           delete (taskDataForFirestore as any).id;
 
-          const newId = await addTaskToFirestore(taskToSave);
-          taskToSave.id = newId; // Gắn ID thật vào để truyền đi báo Cáo hoặc Sync
-
           if (hasGoogleToken) {
             try {
               const gEvent = await addEventToGoogleCalendarAPI(taskToSave);
               showToast(`DEBUG Create GCal Result: ${gEvent?.id ? 'Success' : 'Failed'}`, 'info');
               if (gEvent && gEvent.id) {
-                taskToSave.googleEventId = gEvent.id;
-                await updateTaskInFirestore(taskToSave); // Lưu lại googleEventId
+                taskDataForFirestore.googleEventId = gEvent.id;
                 googleStatusMsg = " & GCal";
               }
             } catch (e) {
               console.warn("Failed to auto-sync create to Google Calendar", e);
             }
           }
+
+          const newId = await addTaskToFirestore(taskDataForFirestore);
+          taskToSave.id = newId; // Gắn ID thật vào để truyền đi báo Cáo hoặc Sync
 
           showToast(`Đã thêm công việc mới${googleStatusMsg}`, "success");
         } else {
