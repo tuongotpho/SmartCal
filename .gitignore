@@ -27,3 +27,6 @@ dist-ssr/
 # Environment variables (QUAN TRỌNG: Không bao giờ push file này)
 .env
 .env.*
+
+# Tauri (Rust build artifacts, rất nặng ~500MB+)
+src-tauri/target/

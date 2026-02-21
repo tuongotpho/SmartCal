@@ -40,6 +40,7 @@ import EditTaskModal from './components/EditTaskModal';
 import ConfirmModal from './components/ConfirmModal';
 import ConflictWarningModal from './components/ConflictWarningModal';
 import LoginScreen from './components/LoginScreen';
+import DesktopAuthHelper from './components/DesktopAuthHelper';
 import AiAssistant from './components/AiAssistant';
 import Toast, { ToastMessage, ToastType } from './components/Toast';
 import Header from './components/Header';
@@ -723,12 +724,16 @@ const App: React.FC = () => {
   if (isAuthLoading) return <div className="flex h-screen items-center justify-center bg-primary-50 dark:bg-gray-950"><RefreshCw className="animate-spin text-primary-600" size={32} /></div>;
   if (!user && !isOfflineMode) return <LoginScreen onBypassAuth={() => { setIsOfflineMode(true); setUseFirebase(false); }} />;
 
+  // Desktop Auth Helper: hiện dialog copy token khi web được mở từ Tauri
+  const isDesktopAuth = new URLSearchParams(window.location.search).get('desktop_auth') === 'true';
+
   return (
     <div
       className="flex flex-col h-screen supports-[height:100dvh]:h-[100dvh] text-gray-800 dark:text-gray-100 bg-primary-50 dark:bg-gray-950 overflow-hidden"
       onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
     >
       <Toast toasts={toasts} onRemove={removeToast} />
+      {isDesktopAuth && <DesktopAuthHelper />}
 
       {/* Header with Install Logic passed down */}
       <Header

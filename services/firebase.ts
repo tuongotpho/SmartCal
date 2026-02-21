@@ -16,8 +16,8 @@ const firebaseConfig = {
 
 // Khởi tạo Firebase
 // Sử dụng check apps.length để tránh lỗi khởi tạo lại khi hot-reload
-const app = !firebase.apps.length 
-  ? firebase.initializeApp(firebaseConfig) 
+const app = !firebase.apps.length
+  ? firebase.initializeApp(firebaseConfig)
   : firebase.app();
 
 // Initialize Firestore (Compat Mode)
@@ -25,15 +25,62 @@ const db = firebase.firestore(app);
 export const auth = firebase.auth(app);
 export const googleProvider = new firebase.auth.GoogleAuthProvider();
 
+// Đảm bảo auth persistence = LOCAL (giữ đăng nhập khi đóng/mở app)
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+// Xử lý kết quả redirect (khi dùng signInWithRedirect trong Tauri)
+auth.getRedirectResult().then((result) => {
+  if (result.user) {
+    console.log("Đăng nhập qua redirect thành công:", result.user.displayName);
+  }
+}).catch((error) => {
+  console.warn("getRedirectResult error:", error.code);
+});
+
 const COLLECTION_NAME = "tasks";
 const USERS_COLLECTION = "users";
 
+// Kiểm tra có đang chạy trong Tauri không
+export const isTauri = (): boolean => {
+  return !!(window as any).__TAURI_INTERNALS__;
+};
+
 // --- AUTH ACTIONS ---
 export const signInWithGoogle = async () => {
+  if (isTauri()) {
+    // Trong Tauri: mở trình duyệt mặc định để đăng nhập
+    try {
+      // @ts-ignore — only available in Tauri runtime
+      const { open } = await import('@tauri-apps/plugin-shell');
+      // Mở trang web app đã deploy để đăng nhập
+      await open('https://smartcal-87.vercel.app?desktop_auth=true');
+    } catch (e) {
+      // Fallback: mở thông qua window.open (có thể bị chặn nhưng thử)
+      window.open('https://smartcal-87.vercel.app?desktop_auth=true', '_blank');
+    }
+    // Throw lỗi đặc biệt để LoginScreen biết cần hiện form paste token
+    throw { code: 'auth/tauri-external', message: 'Đang mở trình duyệt...' };
+  } else {
+    // Trên web: dùng popup bình thường
+    try {
+      await auth.signInWithPopup(googleProvider);
+    } catch (error) {
+      console.error("Login failed", error);
+      throw error;
+    }
+  }
+};
+
+/**
+ * Đăng nhập bằng Google credential token (dùng cho Tauri desktop)
+ * User copy token từ web app → paste vào Tauri app
+ */
+export const signInWithGoogleToken = async (idToken: string) => {
   try {
-    await auth.signInWithPopup(googleProvider);
+    const credential = firebase.auth.GoogleAuthProvider.credential(idToken);
+    await auth.signInWithCredential(credential);
   } catch (error) {
-    console.error("Login failed", error);
+    console.error("Token login failed", error);
     throw error;
   }
 };
@@ -64,16 +111,16 @@ export const subscribeToTasks = (
   callback: (tasks: Task[]) => void,
   onError: (error: any) => void
 ) => {
-  if (!userId) return () => {};
+  if (!userId) return () => { };
 
   // Query: Lấy tasks where userId == userId
   const q = db.collection(COLLECTION_NAME).where('userId', '==', userId);
-  
+
   const unsubscribe = q.onSnapshot((querySnapshot) => {
     const tasks: Task[] = [];
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      
+
       const safeString = (val: any) => (typeof val === 'string' ? val : '');
       const safeBoolean = (val: any) => !!val;
 
@@ -149,10 +196,10 @@ export const subscribeToTags = (
   callback: (tags: Tag[]) => void,
   onError: (error: any) => void
 ) => {
-  if (!userId) return () => {};
+  if (!userId) return () => { };
 
   const docRef = db.collection(USERS_COLLECTION).doc(userId).collection("config").doc("tags");
-  
+
   const unsubscribe = docRef.onSnapshot((docSnap) => {
     if (docSnap.exists) {
       const data = docSnap.data();
@@ -187,7 +234,7 @@ export const saveTagsToFirestore = async (userId: string, tags: Tag[]) => {
   try {
     // Dùng currentUser.uid thay vì tham số userId để đảm bảo bảo mật
     const docRef = db.collection(USERS_COLLECTION).doc(currentUser.uid).collection("config").doc("tags");
-    
+
     const sanitizedTags = tags.map(t => ({
       name: t.name || "Thẻ mới",
       color: t.color || "bg-gray-100 border-gray-300 text-gray-800",
@@ -224,14 +271,14 @@ export const saveTelegramConfigToFirestore = async (userId: string, config: Tele
 export const addTaskToFirestore = async (task: Omit<Task, 'id'>) => {
   const currentUser = auth.currentUser;
   if (!currentUser) {
-     console.warn("Lỗi: Không tìm thấy phiên đăng nhập khi thêm Task.");
-     throw new Error("User not authenticated");
+    console.warn("Lỗi: Không tìm thấy phiên đăng nhập khi thêm Task.");
+    throw new Error("User not authenticated");
   }
 
   try {
     // ÉP BUỘC userId phải là ID của người đang đăng nhập
     const payload = {
-      userId: currentUser.uid, 
+      userId: currentUser.uid,
       title: task.title,
       date: task.date,
       endDate: task.endDate || task.date,
@@ -264,7 +311,7 @@ export const updateTaskInFirestore = async (task: Task) => {
 
   try {
     const taskRef = db.collection(COLLECTION_NAME).doc(task.id);
-    
+
     // Tạo payload sạch, đảm bảo không có trường nào là undefined
     // Firestore sẽ ném lỗi nếu gửi undefined
     const payload: Record<string, any> = {

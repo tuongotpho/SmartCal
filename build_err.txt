@@ -1,0 +1,12 @@
+﻿cargo :    Compiling smartcal v1.0.0 (F:\SmartCal\src-tauri)
+At line:1 char:499
++ ... \src-tauri; $result = cargo build --message-format=short 2>&1 | Out-S 
+...
++                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Compiling sm...tCal\src-taur 
+   i):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+src\lib.rs:62:14: error: proc macro panicked
+error: could not compile `smartcal` (lib) due to 1 previous error
+
