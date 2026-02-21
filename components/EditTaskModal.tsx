@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Task, RecurringType, Tag, Subtask } from '../types';
-import { X, Save, Calendar, Clock, FileText, Type, Repeat, CheckCircle2, Tag as TagIcon, ListChecks, Plus, Trash2, CheckSquare, Square, ArrowRight, Mic, MicOff, Sparkles, RefreshCw, Wand2, ExternalLink } from 'lucide-react';
+import { X, Save, Calendar, Clock, FileText, Type, Repeat, CheckCircle2, Tag as TagIcon, ListChecks, Plus, Trash2, CheckSquare, Square, ArrowRight, Mic, MicOff, Sparkles, RefreshCw, Wand2, ExternalLink, Moon, Sun } from 'lucide-react';
 import { ToastType } from './Toast';
 import { parseTaskWithGemini, suggestSubtasks } from '../services/geminiService';
 import { generateGoogleCalendarLink } from '../services/googleCalendarService';
+import { lunarToSolar, solarToLunar } from '../services/lunarService';
 
 interface EditTaskModalProps {
   isOpen: boolean;
@@ -18,6 +19,12 @@ interface EditTaskModalProps {
 const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, tags, onSave, showToast }) => {
   const [formData, setFormData] = useState<Task | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+
+  // Lunar calendar state
+  const [isLunarMode, setIsLunarMode] = useState(false);
+  const [lunarDay, setLunarDay] = useState(1);
+  const [lunarMonth, setLunarMonth] = useState(1);
+  const [lunarYear, setLunarYear] = useState(new Date().getFullYear());
 
   // Voice & AI State
   const [isListening, setIsListening] = useState(false);
@@ -33,13 +40,30 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
       setFormData({
         ...task,
         title: task.title || '',
-        description: task.description || '', // Ensure no undefined
+        description: task.description || '',
         duration: task.duration || '',
         endDate: task.endDate || task.date,
         recurringType: task.recurringType || (task.isRecurring ? 'daily' : 'none'),
         tags: (task.tags && task.tags.length > 0) ? task.tags : ['Khác'],
         subtasks: task.subtasks || []
       });
+      // Restore lunar mode if task was saved with lunar date
+      if (task.isLunarDate && task.lunarDay && task.lunarMonth && task.lunarYear) {
+        setIsLunarMode(true);
+        setLunarDay(task.lunarDay);
+        setLunarMonth(task.lunarMonth);
+        setLunarYear(task.lunarYear);
+      } else {
+        setIsLunarMode(false);
+        // Parse current solar date to init lunar dropdowns
+        const parts = (task.date || '').split('-');
+        if (parts.length === 3) {
+          const lunar = solarToLunar(parseInt(parts[2]), parseInt(parts[1]), parseInt(parts[0]));
+          setLunarDay(lunar.day);
+          setLunarMonth(lunar.month);
+          setLunarYear(lunar.year);
+        }
+      }
     }
   }, [task]);
 
@@ -216,8 +240,37 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
     if (newEndDate && newEndDate < newDate) {
       newEndDate = newDate;
     }
-    setFormData({ ...formData, date: newDate, endDate: newEndDate });
+    setFormData({ ...formData, date: newDate, endDate: newEndDate, isLunarDate: false });
   }
+
+  // Lunar date change handler
+  const handleLunarDateChange = (day: number, month: number, year: number) => {
+    if (!formData) return;
+    setLunarDay(day);
+    setLunarMonth(month);
+    setLunarYear(year);
+    // Convert to solar and update formData
+    const solar = lunarToSolar(day, month, year, false);
+    if (solar.day > 0) {
+      const solarDateStr = `${solar.year}-${String(solar.month).padStart(2, '0')}-${String(solar.day).padStart(2, '0')}`;
+      setFormData({
+        ...formData,
+        date: solarDateStr,
+        endDate: solarDateStr,
+        isLunarDate: true,
+        lunarDay: day,
+        lunarMonth: month,
+        lunarYear: year
+      });
+    }
+  };
+
+  // Solar preview when in lunar mode
+  const lunarSolarPreview = useMemo(() => {
+    const solar = lunarToSolar(lunarDay, lunarMonth, lunarYear, false);
+    if (solar.day === 0) return 'Ngày không hợp lệ';
+    return `${String(solar.day).padStart(2, '0')}/${String(solar.month).padStart(2, '0')}/${solar.year}`;
+  }, [lunarDay, lunarMonth, lunarYear]);
 
   const handleAddToGoogleCalendar = () => {
     if (!formData) return;
@@ -277,34 +330,116 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
 
           {/* Date Range Section */}
           <div className="flex flex-col gap-2 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-200 dark:border-gray-600">
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1 flex items-center gap-1">
-                  <Calendar size={14} /> Bắt đầu
-                </label>
-                <input
-                  type="date"
-                  value={formData.date}
-                  onChange={handleStartDateChange}
-                  className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
-                />
-              </div>
-              <div className="pt-5 text-gray-400">
-                <ArrowRight size={16} />
-              </div>
-              <div className="flex-1">
-                <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1 flex items-center gap-1">
-                  Kết thúc
-                </label>
-                <input
-                  type="date"
-                  min={formData.date}
-                  value={formData.endDate || formData.date}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
-                />
-              </div>
+            {/* Lunar/Solar Toggle */}
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                {isLunarMode ? <Moon size={14} className="text-yellow-500" /> : <Sun size={14} className="text-orange-500" />}
+                {isLunarMode ? 'Âm lịch' : 'Dương lịch'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLunarMode(!isLunarMode);
+                  if (!isLunarMode && formData) {
+                    // Switching to Lunar: convert current solar date to lunar
+                    const parts = formData.date.split('-');
+                    if (parts.length === 3) {
+                      const lunar = solarToLunar(parseInt(parts[2]), parseInt(parts[1]), parseInt(parts[0]));
+                      setLunarDay(lunar.day);
+                      setLunarMonth(lunar.month);
+                      setLunarYear(lunar.year);
+                    }
+                  }
+                }}
+                className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${isLunarMode ? 'bg-yellow-500' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${isLunarMode ? 'translate-x-5' : 'translate-x-0.5'
+                  }`} />
+              </button>
             </div>
+
+            {isLunarMode ? (
+              /* Lunar Date Dropdowns */
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  {/* Ngày Âm */}
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Ngày</label>
+                    <select
+                      value={lunarDay}
+                      onChange={(e) => handleLunarDateChange(parseInt(e.target.value), lunarMonth, lunarYear)}
+                      className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-yellow-500 outline-none"
+                    >
+                      {Array.from({ length: 30 }, (_, i) => i + 1).map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Tháng Âm */}
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Tháng</label>
+                    <select
+                      value={lunarMonth}
+                      onChange={(e) => handleLunarDateChange(lunarDay, parseInt(e.target.value), lunarYear)}
+                      className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-yellow-500 outline-none"
+                    >
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                        <option key={m} value={m}>Tháng {m}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Năm (Dương) */}
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Năm</label>
+                    <select
+                      value={lunarYear}
+                      onChange={(e) => handleLunarDateChange(lunarDay, lunarMonth, parseInt(e.target.value))}
+                      className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-yellow-500 outline-none"
+                    >
+                      {Array.from({ length: 20 }, (_, i) => new Date().getFullYear() - 5 + i).map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {/* Solar Preview */}
+                <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded border border-yellow-200 dark:border-yellow-800">
+                  <Sun size={12} className="text-orange-400" />
+                  Dương lịch: <span className="font-semibold text-gray-700 dark:text-gray-200">{lunarSolarPreview}</span>
+                </div>
+              </div>
+            ) : (
+              /* Solar Date Inputs (Original) */
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1 flex items-center gap-1">
+                    <Calendar size={14} /> Bắt đầu
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.date}
+                    onChange={handleStartDateChange}
+                    className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
+                  />
+                </div>
+                <div className="pt-5 text-gray-400">
+                  <ArrowRight size={16} />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1 flex items-center gap-1">
+                    Kết thúc
+                  </label>
+                  <input
+                    type="date"
+                    min={formData.date}
+                    value={formData.endDate || formData.date}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    className="w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-orange-500 outline-none"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Time Picker */}
             <div>
@@ -352,8 +487,8 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                       key={t.name}
                       onClick={() => toggleTag(t.name)}
                       className={`text-xs px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5 ${isSelected
-                          ? `${t.color} border-current ring-1 ring-offset-1 dark:ring-offset-gray-800 font-bold shadow-sm`
-                          : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
+                        ? `${t.color} border-current ring-1 ring-offset-1 dark:ring-offset-gray-800 font-bold shadow-sm`
+                        : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
                         }`}
                     >
                       <span className={`w-2 h-2 rounded-full ${isSelected ? t.dot : 'bg-gray-300'}`}></span>

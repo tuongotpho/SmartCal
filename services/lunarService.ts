@@ -1,111 +1,246 @@
 /**
- * Thư viện Lịch Âm (JavaScript Lunar Calendar Library)
- * Hỗ trợ chuyển đổi từ Dương lịch sang Âm lịch.
+ * Lunar Calendar Service - Chuyển đổi Âm Lịch ↔ Dương Lịch (Việt Nam)
+ * Thuật toán dựa trên công trình của Hồ Ngọc Đức.
+ * Hỗ trợ: 1900 - 2100
  */
 
-// Mảng dữ liệu về các tháng nhuận và số ngày của năm âm lịch (1900 - 2100)
-const lunarInfo = [
-  0x04bd8, 0x04ae0, 0x0a570, 0x054d5, 0x0d260, 0x0d950, 0x16554, 0x056a0, 0x09ad0, 0x055d2,
-  0x04ae0, 0x0a5b6, 0x0a4d0, 0x0d250, 0x1d255, 0x0b540, 0x0d6a0, 0x0ada2, 0x095b0, 0x14977,
-  0x04970, 0x0a4b0, 0x0b4b5, 0x06a50, 0x06d40, 0x1ab54, 0x02b60, 0x09570, 0x052f2, 0x04970,
-  0x06566, 0x0d4a0, 0x0ea50, 0x06e95, 0x05ad0, 0x02b60, 0x186e3, 0x092e0, 0x1c8d7, 0x0c950,
-  0x0d4a0, 0x1d8a6, 0x0b550, 0x056a0, 0x1a5b4, 0x025d0, 0x092d0, 0x0d2b2, 0x0a950, 0x0b557,
-  0x06ca0, 0x0b550, 0x15355, 0x04da0, 0x0a5d0, 0x14573, 0x052d0, 0x0a9a8, 0x0e950, 0x06aa0,
-  0x0aea6, 0x0ab50, 0x04b60, 0x0aae4, 0x0a570, 0x05260, 0x0f263, 0x0d950, 0x05b57, 0x056a0,
-  0x096d0, 0x04dd5, 0x04ad0, 0x0a4d0, 0x0d4d4, 0x0d250, 0x0d558, 0x0b540, 0x0b6a0, 0x195a6,
-  0x095b0, 0x049b0, 0x0a974, 0x0a4b0, 0x0b27a, 0x06a50, 0x06d40, 0x0af46, 0x0ab60, 0x09570,
-  0x04af5, 0x04970, 0x064b0, 0x074a3, 0x0ea50, 0x06b58, 0x055c0, 0x0ab60, 0x096d5, 0x092e0,
-  0x0c960, 0x0d954, 0x0d4a0, 0x0da50, 0x07552, 0x056a0, 0x0abb7, 0x025d0, 0x092d0, 0x0cab5,
-  0x0a950, 0x0b4a0, 0x0baa4, 0x0ad50, 0x055d9, 0x04ba0, 0x0a5b0, 0x15176, 0x052b0, 0x0a930,
-  0x07954, 0x06aa0, 0x0ad50, 0x05b52, 0x04b60, 0x0a6e6, 0x0a4e0, 0x0d260, 0x0ea65, 0x0d530,
-  0x05aa0, 0x076a3, 0x096d0, 0x04bd7, 0x04ad0, 0x0a4d0, 0x1d0b6, 0x0d250, 0x0d520, 0x0dd45,
-  0x0b5a0, 0x056d0, 0x055b2, 0x04970, 0x0a577, 0x0a4b0, 0x0aa50, 0x1b255, 0x06d20, 0x0ada0,
-  0x14b63, 0x09370, 0x049f8, 0x04970, 0x064b0, 0x168a6, 0x0ea50, 0x06b20, 0x1a6c4, 0x0aae0,
-  0x0a2e0, 0x0d2e3, 0x0c960, 0x0d557, 0x0d4a0, 0x0da50, 0x05d55, 0x056a0, 0x0a6d0, 0x055d4,
-  0x052d0, 0x0a9b8, 0x0a950, 0x0b4a0, 0x0b6a6, 0x0ad50, 0x055a0, 0x0aba4, 0x0a5b0, 0x052b0,
-  0x0b273, 0x06930, 0x07337, 0x06aa0, 0x0ad50, 0x14b55, 0x04b60, 0x0a570, 0x054e4, 0x0d160,
-  0x0e968, 0x0d520, 0x0daa0, 0x16aa6, 0x056d0, 0x04ae0, 0x0a9d4, 0x0a2d0, 0x0d150, 0x0f252,
-  0x0d520
-];
+const PI = Math.PI;
+
+// Julian Day Number từ ngày Dương lịch
+function jdFromDate(dd: number, mm: number, yy: number): number {
+  const a = Math.floor((14 - mm) / 12);
+  const y = yy + 4800 - a;
+  const m = mm + 12 * a - 3;
+  let jd = dd + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) - 32045;
+  if (jd < 2299161) {
+    jd = dd + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - 32083;
+  }
+  return jd;
+}
+
+// Ngày Dương lịch từ Julian Day Number
+function jdToDate(jd: number): [number, number, number] {
+  let a: number, b: number, c: number;
+  if (jd > 2299160) {
+    a = jd + 32044;
+    b = Math.floor((4 * a + 3) / 146097);
+    c = a - Math.floor((b * 146097) / 4);
+  } else {
+    b = 0;
+    c = jd + 32082;
+  }
+  const d = Math.floor((4 * c + 3) / 1461);
+  const e = c - Math.floor((1461 * d) / 4);
+  const m = Math.floor((5 * e + 2) / 153);
+  const day = e - Math.floor((153 * m + 2) / 5) + 1;
+  const month = m + 3 - 12 * Math.floor(m / 10);
+  const year = b * 100 + d - 4800 + Math.floor(m / 10);
+  return [day, month, year];
+}
+
+function SunLongitude(jdn: number): number {
+  const T = (jdn - 2451545.0) / 36525;
+  const T2 = T * T;
+  const dr = PI / 180;
+  const M = 357.5291 + 35999.0503 * T - 0.0001559 * T2 - 0.00000048 * T * T2;
+  const L0 = 280.46645 + 36000.76983 * T + 0.0003032 * T2;
+  let DL = (1.9146 - 0.004817 * T - 0.000014 * T2) * Math.sin(dr * M);
+  DL += (0.019993 - 0.000101 * T) * Math.sin(dr * 2 * M) + 0.00029 * Math.sin(dr * 3 * M);
+  let L = L0 + DL;
+  L = L * dr;
+  L = L - PI * 2 * Math.floor(L / (PI * 2));
+  return L;
+}
+
+function NewMoon(k: number): number {
+  const T = k / 1236.85;
+  const T2 = T * T;
+  const T3 = T2 * T;
+  const dr = PI / 180;
+  let Jd1 = 2415020.75933 + 29.53058868 * k + 0.0001178 * T2 - 0.000000155 * T3;
+  Jd1 += 0.00033 * Math.sin((166.56 + 132.87 * T - 0.009173 * T2) * dr);
+  const M = 359.2242 + 29.10535608 * k - 0.0000333 * T2 - 0.00000347 * T3;
+  const Mpr = 306.0253 + 385.81691806 * k + 0.0107306 * T2 + 0.00001236 * T3;
+  const F = 21.2964 + 390.67050646 * k - 0.0016528 * T2 - 0.00000239 * T3;
+  let C1 = (0.1734 - 0.000393 * T) * Math.sin(M * dr) + 0.0021 * Math.sin(2 * dr * M);
+  C1 = C1 - 0.4068 * Math.sin(Mpr * dr) + 0.0161 * Math.sin(dr * 2 * Mpr);
+  C1 -= 0.0004 * Math.sin(dr * 3 * Mpr);
+  C1 = C1 + 0.0104 * Math.sin(dr * 2 * F) - 0.0051 * Math.sin(dr * (M + Mpr));
+  C1 = C1 - 0.0074 * Math.sin(dr * (M - Mpr)) + 0.0004 * Math.sin(dr * (2 * F + M));
+  C1 = C1 - 0.0004 * Math.sin(dr * (2 * F - M)) - 0.0006 * Math.sin(dr * (2 * F + Mpr));
+  C1 = C1 + 0.001 * Math.sin(dr * (2 * F - Mpr)) + 0.0005 * Math.sin(dr * (2 * Mpr + M));
+  let deltat: number;
+  if (T < -11) {
+    deltat = 0.001 + 0.000839 * T + 0.0002261 * T2 - 0.00000845 * T3 - 0.000000081 * T * T3;
+  } else {
+    deltat = -0.000278 + 0.000265 * T + 0.000262 * T2;
+  }
+  return Jd1 + C1 - deltat;
+}
+
+function getSunLongitude(jdn: number, timeZone: number): number {
+  return Math.floor((SunLongitude(jdn - 0.5 - timeZone / 24) / PI) * 6);
+}
+
+function getNewMoonDay(k: number, timeZone: number): number {
+  return Math.floor(NewMoon(k) + 0.5 + timeZone / 24);
+}
+
+function getLeapMonthOffset(a11: number, timeZone: number): number {
+  let k = Math.floor((a11 - 2415021.076998695) / 29.530588853 + 0.5);
+  let last: number;
+  let i = 1;
+  let arc = getSunLongitude(getNewMoonDay(k + i, timeZone), timeZone);
+  do {
+    last = arc;
+    i++;
+    arc = getSunLongitude(getNewMoonDay(k + i, timeZone), timeZone);
+  } while (arc !== last && i < 14);
+  return i - 1;
+}
+
+function getLunarMonth11(yy: number, timeZone: number): number {
+  const off = jdFromDate(31, 12, yy) - 2415021.076998695;
+  const k = Math.floor(off / 29.530588853);
+  let nm = getNewMoonDay(k, timeZone);
+  const sunLong = getSunLongitude(nm, timeZone);
+  if (sunLong >= 9) {
+    nm = getNewMoonDay(k - 1, timeZone);
+  }
+  return nm;
+}
+
+// ==============================
+// PUBLIC API
+// ==============================
+
+export interface LunarDate {
+  day: number;
+  month: number;
+  year: number;
+  isLeapMonth: boolean;
+}
+
+export interface SolarDate {
+  day: number;
+  month: number;
+  year: number;
+}
+
+const TIMEZONE = 7; // GMT+7 Vietnam
 
 const CAN = ["Giáp", "Ất", "Bính", "Đinh", "Mậu", "Kỷ", "Canh", "Tân", "Nhâm", "Quý"];
 const CHI = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"];
 
-function getLunarYearDays(y: number) {
-  let i, sum = 348;
-  for (i = 0x8000; i > 0x8; i >>= 1) sum += (lunarInfo[y - 1900] & i) ? 1 : 0;
-  return (sum + leapDays(y));
+/**
+ * Chuyển Dương lịch → Âm lịch
+ */
+export function solarToLunar(dd: number, mm: number, yy: number): LunarDate {
+  const dayNumber = jdFromDate(dd, mm, yy);
+  const k = Math.floor((dayNumber - 2415021.076998695) / 29.530588853);
+  let monthStart = getNewMoonDay(k + 1, TIMEZONE);
+  if (monthStart > dayNumber) {
+    monthStart = getNewMoonDay(k, TIMEZONE);
+  }
+  let a11 = getLunarMonth11(yy, TIMEZONE);
+  let b11 = a11;
+  let lunarYear: number;
+  if (a11 >= monthStart) {
+    lunarYear = yy;
+    a11 = getLunarMonth11(yy - 1, TIMEZONE);
+  } else {
+    lunarYear = yy + 1;
+    b11 = getLunarMonth11(yy + 1, TIMEZONE);
+  }
+  const lunarDay = dayNumber - monthStart + 1;
+  const diff = Math.floor((monthStart - a11) / 29);
+  let lunarLeap = false;
+  let lunarMonth = diff + 11;
+  if (b11 - a11 > 365) {
+    const leapMonthDiff = getLeapMonthOffset(a11, TIMEZONE);
+    if (diff >= leapMonthDiff) {
+      lunarMonth = diff + 10;
+      if (diff === leapMonthDiff) {
+        lunarLeap = true;
+      }
+    }
+  }
+  if (lunarMonth > 12) {
+    lunarMonth = lunarMonth - 12;
+  }
+  if (lunarMonth >= 11 && diff < 4) {
+    lunarYear -= 1;
+  }
+  return { day: lunarDay, month: lunarMonth, year: lunarYear, isLeapMonth: lunarLeap };
 }
 
-function leapDays(y: number) {
-  if (leapMonth(y)) return ((lunarInfo[y - 1900] & 0x10000) ? 30 : 29);
-  return (0);
+/**
+ * Chuyển Âm lịch → Dương lịch
+ */
+export function lunarToSolar(lunarDay: number, lunarMonth: number, lunarYear: number, lunarLeap: boolean = false): SolarDate {
+  let a11: number, b11: number;
+  if (lunarMonth < 11) {
+    a11 = getLunarMonth11(lunarYear - 1, TIMEZONE);
+    b11 = getLunarMonth11(lunarYear, TIMEZONE);
+  } else {
+    a11 = getLunarMonth11(lunarYear, TIMEZONE);
+    b11 = getLunarMonth11(lunarYear + 1, TIMEZONE);
+  }
+  const k = Math.floor(0.5 + (a11 - 2415021.076998695) / 29.530588853);
+  let off = lunarMonth - 11;
+  if (off < 0) {
+    off += 12;
+  }
+  if (b11 - a11 > 365) {
+    const leapOff = getLeapMonthOffset(a11, TIMEZONE);
+    let leapMonth = leapOff - 2;
+    if (leapMonth < 0) {
+      leapMonth += 12;
+    }
+    if (lunarLeap && lunarMonth !== leapMonth) {
+      return { day: 0, month: 0, year: 0 }; // Invalid
+    } else if (lunarLeap || off >= leapOff) {
+      off += 1;
+    }
+  }
+  const monthStart = getNewMoonDay(k + off, TIMEZONE);
+  const [day, month, year] = jdToDate(monthStart + lunarDay - 1);
+  return { day, month, year };
 }
 
-function leapMonth(y: number) {
-  return (lunarInfo[y - 1900] & 0xf);
-}
-
-function monthDays(y: number, m: number) {
-  return ((lunarInfo[y - 1900] & (0x10000 >> m)) ? 30 : 29);
-}
-
+/**
+ * Lấy ngày Âm lịch từ Date object (backward-compatible với phiên bản cũ)
+ */
 export const getLunarDate = (date: Date): { lunarDate: string; lunarCanChi: string } => {
-  let i, leap = 0, temp = 0;
-  const objDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  let offset = (objDate.getTime() - new Date(1900, 0, 31).getTime()) / 86400000;
-
-  let year = 1900;
-  for (i = 1900; i < 2100 && offset > 0; i++) {
-    temp = getLunarYearDays(i);
-    offset -= temp;
-    year = i;
-  }
-
-  if (offset < 0) {
-    offset += temp;
-    year--;
-  }
-
-  let month = 1;
-  leap = leapMonth(year);
-  let isLeap = false;
-
-  for (i = 1; i < 13 && offset > 0; i++) {
-    if (leap > 0 && i === (leap + 1) && !isLeap) {
-      --i;
-      isLeap = true;
-      temp = leapDays(year);
-    } else {
-      temp = monthDays(year, i);
-    }
-
-    if (isLeap && i === (leap + 1)) isLeap = false;
-
-    offset -= temp;
-    if (isLeap === false) month = i;
-  }
-
-  if (offset === 0 && leap > 0 && i === leap + 1) {
-    if (isLeap) isLeap = false;
-    else {
-      isLeap = true;
-      --i;
-    }
-  }
-
-  if (offset < 0) {
-    offset += temp;
-    --i;
-    month = i;
-  }
-
-  const day = Math.floor(offset + 1);
-  const can = CAN[(year - 4) % 10];
-  const chi = CHI[(year - 4) % 12];
-
+  const lunar = solarToLunar(date.getDate(), date.getMonth() + 1, date.getFullYear());
+  const can = CAN[(lunar.year - 4) % 10];
+  const chi = CHI[(lunar.year - 4) % 12];
   return {
-    lunarDate: `${day}/${month}${isLeap ? ' (Nhuận)' : ''}`,
+    lunarDate: `${lunar.day}/${lunar.month}${lunar.isLeapMonth ? ' (Nhuận)' : ''}`,
     lunarCanChi: `Năm ${can} ${chi}`
   };
 };
+
+/**
+ * Format ngày Âm lịch đẹp
+ */
+export function formatLunarDate(lunar: LunarDate): string {
+  return `${lunar.day}/${lunar.month}${lunar.isLeapMonth ? ' (nhuận)' : ''} Âm lịch`;
+}
+
+/**
+ * Lấy ngày Dương lịch cho sự kiện Âm lịch lặp hàng năm
+ * (ví dụ: ngày giỗ 15/7 Âm → trả về ngày Dương cho năm targetYear)
+ */
+export function getLunarAnniversarySolar(lunarDay: number, lunarMonth: number, targetSolarYear: number): SolarDate {
+  // Thử chuyển đổi cho năm Âm = targetSolarYear
+  let result = lunarToSolar(lunarDay, lunarMonth, targetSolarYear, false);
+
+  // Nếu ngày Dương ra năm sai (do lệch lịch), thử năm kế
+  if (result.year !== targetSolarYear) {
+    const alt = lunarToSolar(lunarDay, lunarMonth, targetSolarYear - 1, false);
+    if (alt.year === targetSolarYear) result = alt;
+  }
+
+  return result;
+}

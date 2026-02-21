@@ -30,8 +30,13 @@ export interface Task {
   color?: string;
   subtasks?: Subtask[];
   customStatus?: 'todo' | 'in_progress' | 'done';
-  pomodoroSessions?: number; // Số phiên làm việc đã thực hiện
-  snoozedUntil?: number; // Timestamp Unix cho tính năng báo lại
+  pomodoroSessions?: number;
+  snoozedUntil?: number;
+  // Lunar calendar (Âm lịch)
+  isLunarDate?: boolean;
+  lunarDay?: number;
+  lunarMonth?: number;
+  lunarYear?: number;
 }
 
 export interface TelegramConfig {
