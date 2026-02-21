@@ -196,13 +196,14 @@ export const subscribeToTasks = (
         endDate: endDate,
         time: safeString(data.time) || "00:00",
         duration: safeString(data.duration),
+        description: safeString(data.description),
         completed: safeBoolean(data.completed),
         reminderSent: safeBoolean(data.reminderSent),
         recurringType: recType,
         tags: tags,
         subtasks: subtasks,
         customStatus: data.customStatus,
-        googleEventId: safeString(data.googleEventId)
+        googleEventId: data.googleEventId || undefined
       });
     });
 

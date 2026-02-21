@@ -406,6 +406,7 @@ const App: React.FC = () => {
           if (hasGoogleToken) {
             try {
               const gEvent = await addEventToGoogleCalendarAPI(taskToSave);
+              showToast(`DEBUG Create GCal Result: ${gEvent?.id ? 'Success' : 'Failed'}`, 'info');
               if (gEvent && gEvent.id) {
                 taskToSave.googleEventId = gEvent.id;
                 await updateTaskInFirestore(taskToSave); // Lưu lại googleEventId
@@ -510,7 +511,9 @@ const App: React.FC = () => {
       try {
         const hasGoogleToken = !!getGoogleAccessToken();
         let googleStatusMsg = "";
+
         if (hasGoogleToken) {
+          showToast(`DEBUG Update GCal Check: ${updatedTask.googleEventId ? 'Has ID' : 'MISSING ID'}`, 'info');
           try {
             if (updatedTask.googleEventId) {
               await updateEventInGoogleCalendarAPI(updatedTask.googleEventId, updatedTask);
