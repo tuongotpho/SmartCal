@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { CheckCircle2, WifiOff, AlertTriangle, Mail, Lock, X, LogIn, ExternalLink, Key } from 'lucide-react';
-import { signInWithGoogle, signInWithEmail, signInWithGoogleToken, isTauri } from '../services/firebase';
+import { signInWithGoogle, signInWithEmail, signInWithGoogleToken, isTauri, setGoogleAccessToken } from '../services/firebase';
 
 interface LoginScreenProps {
   onBypassAuth: () => void;
@@ -61,7 +61,23 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
     setTokenLoading(true);
     setError(null);
     try {
-      await signInWithGoogleToken(authToken.trim());
+      const tokenStr = authToken.trim();
+      let idTokenToUse = tokenStr;
+
+      // Thử parse xem có phải dạng JSON chứa cả access token không
+      try {
+        const parsed = JSON.parse(tokenStr);
+        if (parsed.idToken) {
+          idTokenToUse = parsed.idToken;
+          if (parsed.accessToken) {
+            setGoogleAccessToken(parsed.accessToken);
+          }
+        }
+      } catch (e) {
+        // Fallback: Nếu không phải JSON (phiên bản cũ), dùng thẳng token
+      }
+
+      await signInWithGoogleToken(idTokenToUse);
       setShowTokenLogin(false);
       setAuthToken("");
     } catch (err: any) {

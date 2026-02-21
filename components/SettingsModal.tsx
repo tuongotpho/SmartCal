@@ -18,26 +18,26 @@ interface SettingsModalProps {
   isSyncing: boolean;
   lastSyncTime: string;
   showToast: (message: string, type: ToastType) => void;
-  
+
   // Theme Props
   currentTheme?: string;
   setCurrentTheme?: (theme: string) => void;
   themes?: AppTheme[];
-  
+
   // FCM Props
   fcmConfig?: FCMConfig;
   onFCMChange?: (config: FCMConfig) => void;
   userId?: string;
-  
+
   // Reminder Props
   reminderMinutesBefore?: number;
   onReminderMinutesChange?: (minutes: number) => void;
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  telegramConfig, 
+const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  onClose,
+  telegramConfig,
   tags,
   onSaveConfig,
   onSaveTags,
@@ -58,7 +58,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [currentTags, setCurrentTags] = useState<Tag[]>(tags);
   const [activeTab, setActiveTab] = useState<'general' | 'tags'>('general');
   const [newTagName, setNewTagName] = useState('');
-  
+
   // Custom Dropdown State
   const [newTagColorKey, setNewTagColorKey] = useState('Gray');
   const [isColorDropdownOpen, setIsColorDropdownOpen] = useState(false);
@@ -102,7 +102,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleAddTag = () => {
     if (!newTagName.trim()) return;
     const palette = COLOR_PALETTES[newTagColorKey] || COLOR_PALETTES.Gray;
-    
+
     // Check duplicate
     if (currentTags.some(t => t.name.toLowerCase() === newTagName.trim().toLowerCase())) {
       showToast("Tên thẻ đã tồn tại!", "warning");
@@ -138,29 +138,58 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
     setIsFCMLoading(true);
     try {
-      if (localFcmConfig.enabled) {
-        // Disable FCM
-        const success = await disableFCM(userId);
-        if (success) {
+      // Tauri Desktop: dùng native notification thay vì FCM
+      if ((window as any).__TAURI_INTERNALS__) {
+        if (localFcmConfig.enabled) {
           setLocalFcmConfig({ enabled: false, token: null });
           onFCMChange?.({ enabled: false, token: null });
-          showToast("Đã tắt thông báo Push", "info");
+          showToast("Đã tắt thông báo", "info");
         } else {
-          showToast("Lỗi khi tắt thông báo", "error");
+          try {
+            const invoke = (window as any).__TAURI_INTERNALS__.invoke;
+            let granted = await invoke('plugin:notification|is_permission_granted');
+            if (!granted) {
+              const permission = await invoke('plugin:notification|request_permission');
+              granted = permission === 'granted';
+            }
+            if (granted) {
+              setLocalFcmConfig({ enabled: true, token: 'tauri-native' });
+              onFCMChange?.({ enabled: true, token: 'tauri-native' });
+              showToast("Đã bật thông báo Desktop!", "success");
+              // Gửi test notification
+              await invoke('plugin:notification|notify', { body: 'Thông báo Desktop đã được bật!', title: '🔔 SmartCal' });
+            } else {
+              showToast("Quyền thông báo bị từ chối. Vui lòng bật trong Windows Settings.", "warning");
+            }
+          } catch (e) {
+            console.error("Tauri notification error:", e);
+            showToast("Lỗi khi bật thông báo Desktop", "error");
+          }
         }
       } else {
-        // Enable FCM
-        const result = await initializeFCM(userId);
-        setLocalFcmConfig(result);
-        onFCMChange?.(result);
-        if (result.enabled) {
-          showToast("Đã bật thông báo Push!", "success");
+        // Web: dùng FCM như bình thường
+        if (localFcmConfig.enabled) {
+          const success = await disableFCM(userId);
+          if (success) {
+            setLocalFcmConfig({ enabled: false, token: null });
+            onFCMChange?.({ enabled: false, token: null });
+            showToast("Đã tắt thông báo Push", "info");
+          } else {
+            showToast("Lỗi khi tắt thông báo", "error");
+          }
         } else {
-          showToast("Không thể bật thông báo. Vui lòng cho phép quyền thông báo.", "warning");
+          const result = await initializeFCM(userId);
+          setLocalFcmConfig(result);
+          onFCMChange?.(result);
+          if (result.enabled) {
+            showToast("Đã bật thông báo Push!", "success");
+          } else {
+            showToast("Không thể bật thông báo. Vui lòng cho phép quyền thông báo.", "warning");
+          }
         }
       }
     } catch (error) {
-      console.error("FCM toggle error:", error);
+      console.error("Notification toggle error:", error);
       showToast("Lỗi khi thay đổi cài đặt thông báo", "error");
     } finally {
       setIsFCMLoading(false);
@@ -178,18 +207,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </h2>
           <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition"><X size={20} /></button>
         </div>
-        
+
         {/* Tabs */}
         <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0">
-          <button 
+          <button
             onClick={() => setActiveTab('general')}
             className={`flex-1 py-3 text-sm font-semibold transition-colors ${activeTab === 'general' ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400 bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
           >
             Cấu hình chung
           </button>
-          <button 
-             onClick={() => setActiveTab('tags')}
-             className={`flex-1 py-3 text-sm font-semibold transition-colors ${activeTab === 'tags' ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400 bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
+          <button
+            onClick={() => setActiveTab('tags')}
+            className={`flex-1 py-3 text-sm font-semibold transition-colors ${activeTab === 'tags' ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400 bg-white dark:bg-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}
           >
             Quản lý Thẻ (Tags)
           </button>
@@ -198,27 +227,27 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
           {activeTab === 'general' ? (
             <div className="space-y-6">
-              
-               {/* Theme Selection */}
-               {themes && setCurrentTheme && (
-                  <div className="space-y-3">
-                    <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
-                     <Palette size={16} className="text-primary-500" /> Giao diện & Màu sắc
-                    </h3>
-                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                      {themes.map(t => (
-                        <button
-                          key={t.name}
-                          onClick={() => setCurrentTheme(t.name)}
-                          className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition ${currentTheme === t.name ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700'}`}
-                        >
-                           <div className="w-6 h-6 rounded-full border border-gray-200 shadow-sm" style={{ backgroundColor: `rgb(${t.colors[500]})` }}></div>
-                           <span className="text-[10px] text-gray-600 dark:text-gray-300 truncate w-full text-center">{t.label}</span>
-                        </button>
-                      ))}
-                   </div>
-                 </div>
-               )}
+
+              {/* Theme Selection */}
+              {themes && setCurrentTheme && (
+                <div className="space-y-3">
+                  <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
+                    <Palette size={16} className="text-primary-500" /> Giao diện & Màu sắc
+                  </h3>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    {themes.map(t => (
+                      <button
+                        key={t.name}
+                        onClick={() => setCurrentTheme(t.name)}
+                        className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition ${currentTheme === t.name ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                      >
+                        <div className="w-6 h-6 rounded-full border border-gray-200 shadow-sm" style={{ backgroundColor: `rgb(${t.colors[500]})` }}></div>
+                        <span className="text-[10px] text-gray-600 dark:text-gray-300 truncate w-full text-center">{t.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Gemini API Key Section */}
               <div className="space-y-3">
@@ -240,9 +269,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span className="text-[10px] text-gray-500 dark:text-gray-400">
                       {geminiApiKey ? '✅ Đã cấu hình' : '⚠️ Chưa cấu hình - Tính năng AI sẽ không hoạt động'}
                     </span>
-                    <a 
-                      href="https://aistudio.google.com/app/apikey" 
-                      target="_blank" 
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline"
                     >
@@ -256,7 +285,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
                   <MessageSquare size={16} className="text-blue-500" /> Cấu hình Telegram Bot
                 </h3>
-                
+
                 <div className="grid gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Bot Token</label>
@@ -291,12 +320,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       </span>
                     )}
                   </div>
-                  <button 
+                  <button
                     onClick={onManualSync}
                     disabled={isSyncing || !config.botToken}
                     className={`w-full py-2 rounded-lg text-xs font-bold transition shadow-sm flex items-center justify-center gap-2
-                      ${isSyncing || !config.botToken 
-                        ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' 
+                      ${isSyncing || !config.botToken
+                        ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                         : 'bg-white dark:bg-gray-800 border border-primary-300 dark:border-primary-700 text-primary-700 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/30'}
                     `}
                   >
@@ -311,7 +340,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
                   <Bell size={16} className="text-green-500" /> Thông báo Push (Web Push)
                 </h3>
-                
+
                 <div className="bg-green-50 dark:bg-green-900/10 p-3 rounded-lg border border-green-100 dark:border-green-900/30">
                   <div className="flex justify-between items-center mb-2">
                     <div>
@@ -324,13 +353,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         </p>
                       )}
                     </div>
-                    <button 
+                    <button
                       onClick={handleToggleFCM}
                       disabled={isFCMLoading || !userId}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5
-                        ${isFCMLoading 
-                          ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed' 
-                          : localFcmConfig.enabled 
+                        ${isFCMLoading
+                          ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                          : localFcmConfig.enabled
                             ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50'
                             : 'bg-green-500 text-white hover:bg-green-600'}
                       `}
@@ -356,7 +385,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 border-b dark:border-gray-700 pb-2">
                   <AlarmClock size={16} className="text-orange-500" /> Cài đặt Nhắc nhở
                 </h3>
-                
+
                 <div className="bg-orange-50 dark:bg-orange-900/10 p-3 rounded-lg border border-orange-100 dark:border-orange-900/30">
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
                     Thời gian nhắc trước sự kiện
@@ -385,20 +414,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               <h3 className="text-gray-800 dark:text-gray-200 font-semibold text-sm flex items-center gap-2 pb-2">
                 <TagIcon size={16} className="text-primary-500" /> Danh sách Thẻ phân loại
               </h3>
-              
+
               {/* Add New Tag */}
               <div className="flex gap-2 items-end bg-gray-50 dark:bg-gray-700 p-3 rounded border border-gray-200 dark:border-gray-600">
                 <div className="flex-1">
                   <label className="text-xs text-gray-500 dark:text-gray-300 mb-1 block">Tên thẻ mới</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={newTagName}
                     onChange={(e) => setNewTagName(e.target.value)}
-                    placeholder="VD: Dự án A" 
+                    placeholder="VD: Dự án A"
                     className="w-full text-sm p-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                   />
                 </div>
-                
+
                 {/* Custom Color Dropdown */}
                 <div className="w-1/3 relative" ref={dropdownRef}>
                   <label className="text-xs text-gray-500 dark:text-gray-300 mb-1 block">Màu sắc</label>
@@ -407,8 +436,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="w-full text-sm p-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white flex items-center justify-between"
                   >
                     <div className="flex items-center gap-2 overflow-hidden">
-                       <div className={`w-3 h-3 rounded-full ${COLOR_PALETTES[newTagColorKey]?.dot}`}></div>
-                       <span className="truncate">{COLOR_PALETTES[newTagColorKey]?.label}</span>
+                      <div className={`w-3 h-3 rounded-full ${COLOR_PALETTES[newTagColorKey]?.dot}`}></div>
+                      <span className="truncate">{COLOR_PALETTES[newTagColorKey]?.label}</span>
                     </div>
                     <ChevronDown size={14} className="text-gray-400" />
                   </button>
@@ -416,23 +445,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   {isColorDropdownOpen && (
                     <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg z-50 max-h-48 overflow-y-auto custom-scrollbar">
                       {Object.keys(COLOR_PALETTES).map(key => (
-                        <div 
-                          key={key} 
+                        <div
+                          key={key}
                           onClick={() => {
                             setNewTagColorKey(key);
                             setIsColorDropdownOpen(false);
                           }}
                           className="flex items-center gap-2 p-2 hover:bg-primary-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-700 dark:text-gray-200"
                         >
-                           <div className={`w-3 h-3 rounded-full ${COLOR_PALETTES[key].dot}`}></div>
-                           <span>{COLOR_PALETTES[key].label}</span>
+                          <div className={`w-3 h-3 rounded-full ${COLOR_PALETTES[key].dot}`}></div>
+                          <span>{COLOR_PALETTES[key].label}</span>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
 
-                <button 
+                <button
                   onClick={handleAddTag}
                   className="bg-primary-500 hover:bg-primary-600 text-white p-2 rounded transition"
                 >
@@ -449,7 +478,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       <span className="font-semibold text-sm text-gray-700 dark:text-gray-200">{tag.name}</span>
                     </div>
                     {tag.name !== 'Khác' && (
-                      <button 
+                      <button
                         onClick={() => handleDeleteTagRequest(tag.name)}
                         className="text-gray-400 hover:text-red-500 p-1 transition"
                       >
@@ -483,9 +512,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
       </div>
-      
+
       {/* Modal Xác nhận xóa Thẻ */}
-      <ConfirmModal 
+      <ConfirmModal
         isOpen={!!tagToDelete}
         onClose={() => setTagToDelete(null)}
         onConfirm={confirmDeleteTag}

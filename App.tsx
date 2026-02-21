@@ -225,10 +225,9 @@ const App: React.FC = () => {
       if ((window as any).__TAURI_INTERNALS__) {
         // Tauri: dùng native notification plugin
         try {
-          const pluginName = '@tauri-apps/plugin-notification';
-          const notif = await import(/* @vite-ignore */ pluginName);
-          const granted = await notif.isPermissionGranted();
-          if (!granted) await notif.requestPermission();
+          const invoke = (window as any).__TAURI_INTERNALS__.invoke;
+          const granted = await invoke('plugin:notification|is_permission_granted');
+          if (!granted) await invoke('plugin:notification|request_permission');
         } catch (e) {
           console.warn('Tauri notification plugin not available:', e);
         }
@@ -537,11 +536,10 @@ const App: React.FC = () => {
           // 2. Gửi Browser / Native Notification
           if ((window as any).__TAURI_INTERNALS__) {
             try {
-              const pluginName = '@tauri-apps/plugin-notification';
-              const notif = await import(/* @vite-ignore */ pluginName);
-              await notif.sendNotification({
-                title: `🔔 Sắp đến hạn: ${task.title}`,
-                body: `${task.time} - ${task.description || 'Không có mô tả'}`
+              const invoke = (window as any).__TAURI_INTERNALS__.invoke;
+              await invoke('plugin:notification|notify', {
+                body: `${task.time} - ${task.description || 'Không có mô tả'}`,
+                title: `🔔 Sắp đến hạn: ${task.title}`
               });
             } catch (e) {
               console.warn('Tauri notification failed:', e);

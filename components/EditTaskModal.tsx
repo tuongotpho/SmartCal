@@ -4,7 +4,7 @@ import { Task, RecurringType, Tag, Subtask } from '../types';
 import { X, Save, Calendar, Clock, FileText, Type, Repeat, CheckCircle2, Tag as TagIcon, ListChecks, Plus, Trash2, CheckSquare, Square, ArrowRight, Mic, MicOff, Sparkles, RefreshCw, Wand2, ExternalLink, Moon, Sun } from 'lucide-react';
 import { ToastType } from './Toast';
 import { parseTaskWithGemini, suggestSubtasks } from '../services/geminiService';
-import { generateGoogleCalendarLink } from '../services/googleCalendarService';
+import { addEventToGoogleCalendarAPI } from '../services/googleCalendarApiService';
 import { lunarToSolar, solarToLunar } from '../services/lunarService';
 
 interface EditTaskModalProps {
@@ -272,11 +272,24 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
     return `${String(solar.day).padStart(2, '0')}/${String(solar.month).padStart(2, '0')}/${solar.year}`;
   }, [lunarDay, lunarMonth, lunarYear]);
 
-  const handleAddToGoogleCalendar = () => {
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+
+  const handleAddToGoogleCalendar = async () => {
     if (!formData) return;
-    const link = generateGoogleCalendarLink(formData);
-    window.open(link, '_blank');
-    showToast("Đang mở Google Calendar...", "info");
+    setIsSyncingCalendar(true);
+    try {
+      showToast("Đang đồng bộ Google Calendar...", "info");
+      await addEventToGoogleCalendarAPI(formData);
+      showToast("Đã thêm vào Google Calendar thành công! 🎉", "success");
+    } catch (error: any) {
+      if (error.message === 'missing_token' || error.message === 'unauthorized') {
+        showToast("Vui lòng đăng xuất và đăng nhập lại bằng Google để cấp quyền Lịch!", "warning");
+      } else {
+        showToast("Lỗi khi đồng bộ Google Calendar", "error");
+      }
+    } finally {
+      setIsSyncingCalendar(false);
+    }
   };
 
   if (!isOpen || !formData) return null;
@@ -587,9 +600,20 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
           <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
             <button
               onClick={handleAddToGoogleCalendar}
-              className="w-full flex items-center justify-center gap-2 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 py-2 rounded-lg transition"
+              disabled={isSyncingCalendar || formData.id === 'temp'}
+              title={formData.id === 'temp' ? 'Vui lòng lưu sự kiện trước khi thêm vào Google Calendar' : ''}
+              className={`w-full flex items-center justify-center gap-2 text-xs font-semibold py-2 rounded-lg transition
+                ${isSyncingCalendar || formData.id === 'temp'
+                  ? 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed'
+                  : 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30'
+                }
+              `}
             >
-              <ExternalLink size={14} /> Thêm vào Google Calendar (Nhắc nhở chắc chắn)
+              {isSyncingCalendar ? (
+                <><RefreshCw size={14} className="animate-spin" /> Đang đồng bộ...</>
+              ) : (
+                <><ExternalLink size={14} /> Thêm vào Google Calendar (Đồng bộ trực tiếp)</>
+              )}
             </button>
           </div>
 

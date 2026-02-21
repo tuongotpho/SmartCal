@@ -24,6 +24,8 @@ const app = !firebase.apps.length
 const db = firebase.firestore(app);
 export const auth = firebase.auth(app);
 export const googleProvider = new firebase.auth.GoogleAuthProvider();
+// Thêm quyền ghi lịch vào Google Calendar
+googleProvider.addScope('https://www.googleapis.com/auth/calendar.events');
 
 // Đảm bảo auth persistence = LOCAL (giữ đăng nhập khi đóng/mở app)
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
@@ -40,6 +42,12 @@ auth.getRedirectResult().then((result) => {
 const COLLECTION_NAME = "tasks";
 const USERS_COLLECTION = "users";
 
+// Key lưu trữ Google Access Token
+const GOOGLE_ACCESS_TOKEN_KEY = "google_calendar_access_token";
+
+export const getGoogleAccessToken = () => localStorage.getItem(GOOGLE_ACCESS_TOKEN_KEY);
+export const setGoogleAccessToken = (token: string) => localStorage.setItem(GOOGLE_ACCESS_TOKEN_KEY, token);
+
 // Kiểm tra có đang chạy trong Tauri không
 export const isTauri = (): boolean => {
   return !!(window as any).__TAURI_INTERNALS__;
@@ -50,7 +58,6 @@ export const signInWithGoogle = async () => {
   if (isTauri()) {
     // Trong Tauri: mở trình duyệt mặc định để đăng nhập
     try {
-      // Dùng trực tiếp API Core của Tauri thay vì plugin-shell (hay bị lỗi bundle/capabilities)
       const tauri = window as any;
       if (tauri.__TAURI_INTERNALS__ && tauri.__TAURI_INTERNALS__.invoke) {
         await tauri.__TAURI_INTERNALS__.invoke('plugin:shell|open', {
@@ -71,12 +78,23 @@ export const signInWithGoogle = async () => {
     try {
       const result = await auth.signInWithPopup(googleProvider);
 
-      // Nếu đang trong luồng cấp quyền cho Desktop App, return ID token thật của Google
+      // Lưu lại access token cho web ngay lập tức
+      const credential = result.credential as any;
+      if (credential && credential.accessToken) {
+        setGoogleAccessToken(credential.accessToken);
+      }
+
+      // Nếu đang trong luồng cấp quyền cho Desktop App, return ID token VÀ Access Token
       const params = new URLSearchParams(window.location.search);
       if (params.get('desktop_auth') === 'true') {
-        const credential = result.credential as any;
         if (credential && credential.idToken) {
-          return { type: 'oauth_token', token: credential.idToken };
+          // Serialize thành string để user dễ copy 1 cuộn
+          return {
+            type: 'oauth_token', token: JSON.stringify({
+              idToken: credential.idToken,
+              accessToken: credential.accessToken || ''
+            })
+          };
         }
       }
       return result;
