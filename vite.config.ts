@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      external: ['@tauri-apps/plugin-shell', '@tauri-apps/api']
+    }
   },
   server: {
     port: 3000,
