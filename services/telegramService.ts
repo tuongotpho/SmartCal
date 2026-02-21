@@ -51,6 +51,11 @@ export const fetchTelegramUpdates = async (config: TelegramConfig, offset: numbe
     const data = await res.json();
 
     if (data.ok && Array.isArray(data.result)) {
+      if (data.result.length > 0) {
+        const maxId = Math.max(...data.result.map((u: any) => u.update_id));
+        // Acknowledge immediately to prevent duplicates on other devices
+        fetch(`https://api.telegram.org/bot${config.botToken}/getUpdates?offset=${maxId + 1}&limit=1`).catch(() => { });
+      }
       // Trả về cả update_id để client lưu lại trạng thái
       return data.result
         .filter((update: any) => update.message && update.message.text)

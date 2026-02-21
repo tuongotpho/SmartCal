@@ -508,8 +508,26 @@ const App: React.FC = () => {
     // Save to persistence
     if (useFirebase && !isOfflineMode) {
       try {
+        const hasGoogleToken = !!getGoogleAccessToken();
+        let googleStatusMsg = "";
+        if (hasGoogleToken) {
+          try {
+            if (updatedTask.googleEventId) {
+              await updateEventInGoogleCalendarAPI(updatedTask.googleEventId, updatedTask);
+              googleStatusMsg = " & GCal";
+            } else {
+              const gEvent = await addEventToGoogleCalendarAPI(updatedTask);
+              if (gEvent && gEvent.id) {
+                updatedTask.googleEventId = gEvent.id;
+                googleStatusMsg = " & GCal Lần đầu";
+              }
+            }
+          } catch (e) {
+            console.warn("Failed to auto-sync update to Google Calendar", e);
+          }
+        }
         await updateTaskInFirestore(updatedTask);
-        if (notify) showToast("Đã lưu thay đổi", "success");
+        if (notify) showToast(`Đã lưu thay đổi${googleStatusMsg}`, "success");
       } catch (e) {
         if (notify) showToast("Lỗi cập nhật", "warning");
       }
@@ -614,11 +632,7 @@ const App: React.FC = () => {
   const handleToggleComplete = useCallback(async (task: Task) => {
     const nextState = !task.completed;
     const updated = { ...task, completed: nextState };
-    setTasks(prev => prev.map(t => t.id === task.id ? updated : t));
-
-    if (useFirebase && !isOfflineMode) {
-      await updateTaskInFirestore(updated);
-    }
+    await handleUpdateTask(updated, false);
 
     if (nextState) {
       hapticFeedback.medium();
@@ -692,7 +706,7 @@ const App: React.FC = () => {
     // Nếu đang sync thì thôi, tránh chồng chéo
     if (isSyncing) return; // Note: isSyncing ref might be better here to avoid dependency change, but let's stick to simple fix first
 
-    if (!isSilent) setIsSyncing(true);
+    setIsSyncing(true);
 
     try {
       // 1. Lấy tin nhắn mới nhất (dựa trên offset)
@@ -764,7 +778,7 @@ const App: React.FC = () => {
         addNotification("Lỗi Đồng bộ", "Không thể kết nối Telegram. Vui lòng thử lại sau.", "error");
       }
     } finally {
-      if (!isSilent) setIsSyncing(false);
+      setIsSyncing(false);
     }
   }, [telegramConfig, lastTelegramUpdateId, tags, handleRequestAddTask, showToast, isSyncing, user, isOfflineMode]);
 
