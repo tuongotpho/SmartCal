@@ -214,6 +214,11 @@ export const subscribeToTasks = (
       return timeA.localeCompare(timeB);
     });
 
+    if (tasks.length > 0) {
+      console.log('DEBUG Firestore Tasks [0]:', { id: tasks[0].id, googleEventId: tasks[0].googleEventId });
+      // Ghi nhớ cái task cuối cùng vừa được tạo (dựa vào thời gian tạo để check xem có googleEventId không)
+    }
+
     callback(tasks);
   }, (error: any) => {
     console.warn("Firestore subscription warning:", error.message);
