@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   CalendarPlus,
   PenLine,
@@ -10,12 +10,15 @@ import {
   ChevronRight,
   Plus,
   BarChart3,
-  Bot
+  Bot,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { format, addDays, isValid } from 'date-fns';
 import { Task, RecurringType, Tag, Subtask } from '../types';
 import { parseTaskWithGemini } from '../services/geminiService';
 import { ToastType } from './Toast';
+import { lunarToSolar, solarToLunar } from '../services/lunarService';
 
 interface SidebarProps {
   onAddTask: (task: Task) => Promise<void>;
@@ -63,6 +66,37 @@ const Sidebar: React.FC<SidebarProps> = ({
     description: '',
     checklistText: ''
   });
+
+  // Lunar calendar state
+  const [isLunarMode, setIsLunarMode] = useState(false);
+  const [lunarDay, setLunarDay] = useState(() => {
+    const now = new Date();
+    const l = solarToLunar(now.getDate(), now.getMonth() + 1, now.getFullYear());
+    return l.day;
+  });
+  const [lunarMonth, setLunarMonth] = useState(() => {
+    const now = new Date();
+    const l = solarToLunar(now.getDate(), now.getMonth() + 1, now.getFullYear());
+    return l.month;
+  });
+  const [lunarYear, setLunarYear] = useState(new Date().getFullYear());
+
+  const handleLunarChange = (day: number, month: number, year: number) => {
+    setLunarDay(day);
+    setLunarMonth(month);
+    setLunarYear(year);
+    const solar = lunarToSolar(day, month, year, false);
+    if (solar.day > 0) {
+      const solarStr = `${solar.year}-${String(solar.month).padStart(2, '0')}-${String(solar.day).padStart(2, '0')}`;
+      setManualForm(prev => ({ ...prev, date: solarStr, endDate: solarStr }));
+    }
+  };
+
+  const lunarSolarPreview = useMemo(() => {
+    const solar = lunarToSolar(lunarDay, lunarMonth, lunarYear, false);
+    if (solar.day === 0) return 'Ngày không hợp lệ';
+    return `${String(solar.day).padStart(2, '0')}/${String(solar.month).padStart(2, '0')}/${solar.year}`;
+  }, [lunarDay, lunarMonth, lunarYear]);
 
   // --- Voice Input Logic ---
   const toggleVoiceInput = () => {
@@ -291,7 +325,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       reminderSent: false,
       recurringType: manualForm.recurringType,
       tags: [manualForm.tag],
-      subtasks: subtasks
+      subtasks: subtasks,
+      ...(isLunarMode ? { isLunarDate: true, lunarDay, lunarMonth, lunarYear } : {})
     };
 
     try {
@@ -320,8 +355,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={() => setSidebarTab('manual')}
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-md transition-all ${sidebarTab === 'manual'
-                ? 'bg-primary-100 dark:bg-gray-600 text-primary-700 dark:text-white shadow-sm'
-                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
+              ? 'bg-primary-100 dark:bg-gray-600 text-primary-700 dark:text-white shadow-sm'
+              : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
               }`}
           >
             <PenLine size={12} /> Thủ công
@@ -329,8 +364,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={() => setSidebarTab('ai')}
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-md transition-all ${sidebarTab === 'ai'
-                ? 'bg-primary-100 dark:bg-gray-600 text-primary-700 dark:text-white shadow-sm'
-                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
+              ? 'bg-primary-100 dark:bg-gray-600 text-primary-700 dark:text-white shadow-sm'
+              : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
               }`}
           >
             <Sparkles size={12} /> AI Nhập nhanh
@@ -367,26 +402,82 @@ const Sidebar: React.FC<SidebarProps> = ({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Ngày bắt đầu</label>
-                <input
-                  type="date"
-                  value={manualForm.date}
-                  onChange={(e) => setManualForm({ ...manualForm, date: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
-                />
+            <div>
+              {/* Lunar/Solar Toggle */}
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
+                  {isLunarMode ? <Moon size={10} className="text-yellow-500" /> : <Sun size={10} className="text-orange-500" />}
+                  {isLunarMode ? 'Âm lịch' : 'Dương lịch'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLunarMode(!isLunarMode);
+                    if (!isLunarMode) {
+                      const parts = manualForm.date.split('-');
+                      if (parts.length === 3) {
+                        const lunar = solarToLunar(parseInt(parts[2]), parseInt(parts[1]), parseInt(parts[0]));
+                        setLunarDay(lunar.day);
+                        setLunarMonth(lunar.month);
+                        setLunarYear(lunar.year);
+                      }
+                    }
+                  }}
+                  className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${isLunarMode ? 'bg-yellow-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                >
+                  <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${isLunarMode ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
               </div>
-              <div>
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Ngày kết thúc</label>
-                <input
-                  type="date"
-                  min={manualForm.date}
-                  value={manualForm.endDate}
-                  onChange={(e) => setManualForm({ ...manualForm, endDate: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
-                />
-              </div>
+
+              {isLunarMode ? (
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-3 gap-1">
+                    <div>
+                      <label className="text-[9px] text-gray-400">Ngày</label>
+                      <select value={lunarDay} onChange={(e) => handleLunarChange(parseInt(e.target.value), lunarMonth, lunarYear)} className="w-full border border-gray-300 dark:border-gray-600 rounded px-1 py-1 text-xs focus:ring-2 focus:ring-yellow-500 outline-none bg-white dark:bg-gray-700 dark:text-white">
+                        {Array.from({ length: 30 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-gray-400">Tháng</label>
+                      <select value={lunarMonth} onChange={(e) => handleLunarChange(lunarDay, parseInt(e.target.value), lunarYear)} className="w-full border border-gray-300 dark:border-gray-600 rounded px-1 py-1 text-xs focus:ring-2 focus:ring-yellow-500 outline-none bg-white dark:bg-gray-700 dark:text-white">
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>T{m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-gray-400">Năm</label>
+                      <select value={lunarYear} onChange={(e) => handleLunarChange(lunarDay, lunarMonth, parseInt(e.target.value))} className="w-full border border-gray-300 dark:border-gray-600 rounded px-1 py-1 text-xs focus:ring-2 focus:ring-yellow-500 outline-none bg-white dark:bg-gray-700 dark:text-white">
+                        {Array.from({ length: 20 }, (_, i) => new Date().getFullYear() - 5 + i).map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-gray-400 flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/20 px-1.5 py-0.5 rounded border border-yellow-200 dark:border-yellow-800">
+                    <Sun size={10} className="text-orange-400" /> Dương lịch: <span className="font-semibold text-gray-600 dark:text-gray-200">{lunarSolarPreview}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Ngày bắt đầu</label>
+                    <input
+                      type="date"
+                      value={manualForm.date}
+                      onChange={(e) => setManualForm({ ...manualForm, date: e.target.value })}
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Ngày kết thúc</label>
+                    <input
+                      type="date"
+                      min={manualForm.date}
+                      value={manualForm.endDate}
+                      onChange={(e) => setManualForm({ ...manualForm, endDate: e.target.value })}
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-2">
