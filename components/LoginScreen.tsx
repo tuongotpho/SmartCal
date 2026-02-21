@@ -23,11 +23,20 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
 
   const isDesktopApp = isTauri();
 
+  const [showCopyToken, setShowCopyToken] = useState<string | null>(null);
+
   const handleLogin = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      await signInWithGoogle();
+      const result: any = await signInWithGoogle();
+
+      // Nếu là luồng xác thực từ desktop app, API trả về oauth_token thuần
+      if (result && result.type === 'oauth_token') {
+        setShowCopyToken(result.token);
+        setIsLoading(false);
+        return; // Dừng tại đây, không cho load vào màn hình chính
+      }
     } catch (err: any) {
       console.error("Login Error:", err);
       if (err.code === 'auth/tauri-external') {
@@ -42,7 +51,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
         setError(msg);
       }
     } finally {
-      setIsLoading(false);
+      if (!showCopyToken) setIsLoading(false);
     }
   };
 
@@ -195,6 +204,41 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
         <p className="mt-6 text-[10px] text-gray-400 dark:text-gray-500">
           * Chế độ Offline sẽ lưu dữ liệu trên trình duyệt của bạn. Dữ liệu có thể mất nếu xóa cache.
         </p>
+
+        {showCopyToken && (
+          <div className="absolute inset-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-2xl animate-in fade-in duration-200">
+            <div className="w-full max-w-xs p-4 text-center">
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full mx-auto flex items-center justify-center mb-4">
+                <CheckCircle2 size={28} className="text-green-600" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
+                Đăng nhập thành công! 🎉
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                Bấm nút bên dưới để copy token, sau đó dán vào ứng dụng Desktop SmartCal.
+              </p>
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(showCopyToken);
+                    alert("Đã copy thành công!");
+                  } catch (e) {
+                    const el = document.createElement("textarea");
+                    el.value = showCopyToken;
+                    document.body.appendChild(el);
+                    el.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(el);
+                    alert("Đã copy thành công!");
+                  }
+                }}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-95"
+              >
+                📋 Copy Token
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Secret Login Modal */}
         {showSecretLogin && (

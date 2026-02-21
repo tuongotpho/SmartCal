@@ -19,7 +19,12 @@
                 "center": true,
                 "resizable": true
             }
-        ]
+        ],
+        "security": {
+            "capabilities": [
+                "default"
+            ]
+        }
     },
     "bundle": {
         "active": true,

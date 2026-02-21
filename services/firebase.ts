@@ -50,12 +50,18 @@ export const signInWithGoogle = async () => {
   if (isTauri()) {
     // Trong Tauri: mở trình duyệt mặc định để đăng nhập
     try {
-      // @ts-ignore — only available in Tauri runtime
-      const { open } = await import('@tauri-apps/plugin-shell');
-      // Mở trang web app đã deploy để đăng nhập
-      await open('https://smartcal-87.vercel.app?desktop_auth=true');
+      // Dùng trực tiếp API Core của Tauri thay vì plugin-shell (hay bị lỗi bundle/capabilities)
+      const tauri = window as any;
+      if (tauri.__TAURI_INTERNALS__ && tauri.__TAURI_INTERNALS__.invoke) {
+        await tauri.__TAURI_INTERNALS__.invoke('plugin:shell|open', {
+          path: 'https://smartcal-87.vercel.app?desktop_auth=true',
+          with: null
+        });
+      } else {
+        window.open('https://smartcal-87.vercel.app?desktop_auth=true', '_blank');
+      }
     } catch (e) {
-      // Fallback: mở thông qua window.open (có thể bị chặn nhưng thử)
+      console.error("Lỗi mở trình duyệt:", e);
       window.open('https://smartcal-87.vercel.app?desktop_auth=true', '_blank');
     }
     // Throw lỗi đặc biệt để LoginScreen biết cần hiện form paste token
@@ -63,7 +69,17 @@ export const signInWithGoogle = async () => {
   } else {
     // Trên web: dùng popup bình thường
     try {
-      await auth.signInWithPopup(googleProvider);
+      const result = await auth.signInWithPopup(googleProvider);
+
+      // Nếu đang trong luồng cấp quyền cho Desktop App, return ID token thật của Google
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('desktop_auth') === 'true') {
+        const credential = result.credential as any;
+        if (credential && credential.idToken) {
+          return { type: 'oauth_token', token: credential.idToken };
+        }
+      }
+      return result;
     } catch (error) {
       console.error("Login failed", error);
       throw error;
