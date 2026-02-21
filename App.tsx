@@ -403,7 +403,6 @@ const App: React.FC = () => {
           if (hasGoogleToken) {
             try {
               const gEvent = await addEventToGoogleCalendarAPI(taskToSave);
-              showToast(`DEBUG Create GCal Result: ${gEvent?.id ? 'Success' : 'Failed'}`, 'info');
               if (gEvent && gEvent.id) {
                 taskDataForFirestore.googleEventId = gEvent.id;
                 googleStatusMsg = " & GCal";
@@ -512,7 +511,6 @@ const App: React.FC = () => {
         let googleStatusMsg = "";
 
         if (hasGoogleToken) {
-          showToast(`DEBUG Update GCal Check: ${updatedTask.googleEventId ? 'Has ID' : 'MISSING ID'}`, 'info');
           try {
             if (updatedTask.googleEventId) {
               await updateEventInGoogleCalendarAPI(updatedTask.googleEventId, updatedTask);

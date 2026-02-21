@@ -66,7 +66,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({
             {task.recurringType !== 'none' && <Repeat size={10} className="text-blue-500" />}
           </div>
           <h3 className={`text-sm font-bold truncate text-gray-800 dark:text-gray-200 ${task.completed ? 'line-through' : ''}`}>
-            {task.title} {task.googleEventId ? '📅' : ''}
+            {task.title}
           </h3>
           {task.description && <p className="text-[10px] text-gray-500 truncate">{task.description}</p>}
         </div>
