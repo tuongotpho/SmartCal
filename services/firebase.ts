@@ -328,8 +328,8 @@ export const addTaskToFirestore = async (task: Omit<Task, 'id'>) => {
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    await db.collection(COLLECTION_NAME).add(payload);
-    return true;
+    const docRef = await db.collection(COLLECTION_NAME).add(payload);
+    return docRef.id;
   } catch (e: any) {
     console.warn("Lỗi khi thêm Task vào Firestore:", e.message);
     throw e;

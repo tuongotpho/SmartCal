@@ -58,6 +58,8 @@ import { subscribeToTasks, subscribeToTags, saveTagsToFirestore, addTaskToFirest
 import { hapticFeedback } from './services/hapticService';
 import { initializeFCM, onForegroundMessage, checkFCMSupport, FCMConfig } from './services/fcmService';
 import { soundService } from './services/soundService';
+import { addEventToGoogleCalendarAPI, updateEventInGoogleCalendarAPI, deleteEventFromGoogleCalendarAPI } from './services/googleCalendarApiService';
+import { getGoogleAccessToken } from './services/firebase';
 
 export const APP_THEMES: AppTheme[] = [
   {
@@ -389,12 +391,53 @@ const App: React.FC = () => {
   const saveTaskToDatabase = useCallback(async (task: Task) => {
     if (useFirebase && !isOfflineMode) {
       try {
+        let taskToSave = { ...task };
+        const hasGoogleToken = !!getGoogleAccessToken();
+        let googleStatusMsg = "";
+
         if (task.id === 'temp') {
-          await addTaskToFirestore(task);
-          showToast("Đã thêm công việc mới", "success");
+          // Xóa ID tạm để Firestore tự gen thật
+          const taskDataForFirestore = { ...taskToSave };
+          delete (taskDataForFirestore as any).id;
+
+          const newId = await addTaskToFirestore(taskToSave);
+          taskToSave.id = newId; // Gắn ID thật vào để truyền đi báo Cáo hoặc Sync
+
+          if (hasGoogleToken) {
+            try {
+              const gEvent = await addEventToGoogleCalendarAPI(taskToSave);
+              if (gEvent && gEvent.id) {
+                taskToSave.googleEventId = gEvent.id;
+                await updateTaskInFirestore(taskToSave); // Lưu lại googleEventId
+                googleStatusMsg = " & GCal";
+              }
+            } catch (e) {
+              console.warn("Failed to auto-sync create to Google Calendar", e);
+            }
+          }
+
+          showToast(`Đã thêm công việc mới${googleStatusMsg}`, "success");
         } else {
-          await updateTaskInFirestore(task);
-          showToast("Đã lưu thay đổi", "success");
+
+          if (hasGoogleToken) {
+            try {
+              if (taskToSave.googleEventId) {
+                await updateEventInGoogleCalendarAPI(taskToSave.googleEventId, taskToSave);
+                googleStatusMsg = " & GCal";
+              } else {
+                // Trường hợp task cũ chưa có link, nhưng giờ có token, ta tạo link mới luôn
+                const gEvent = await addEventToGoogleCalendarAPI(taskToSave);
+                if (gEvent && gEvent.id) {
+                  taskToSave.googleEventId = gEvent.id;
+                  googleStatusMsg = " & GCal Lần đầu";
+                }
+              }
+            } catch (e) {
+              console.warn("Failed to auto-sync update to Google Calendar", e);
+            }
+          }
+          await updateTaskInFirestore(taskToSave);
+          showToast(`Đã lưu thay đổi${googleStatusMsg}`, "success");
         }
       } catch (e) {
         showToast("Lỗi đồng bộ Cloud", "warning");
@@ -616,6 +659,17 @@ const App: React.FC = () => {
   const executeDeleteTask = useCallback(async () => {
     if (!taskToDeleteId) return;
     try {
+      const taskToDelete = tasks.find(t => t.id === taskToDeleteId);
+
+      // Auto-Sync: Xóa trên Google Calendar nếu có googleEventId
+      if (taskToDelete && taskToDelete.googleEventId && !!getGoogleAccessToken()) {
+        try {
+          await deleteEventFromGoogleCalendarAPI(taskToDelete.googleEventId);
+        } catch (e) {
+          console.warn("Failed to delete event from Google Calendar", e);
+        }
+      }
+
       if (useFirebase && !isOfflineMode) await deleteTaskFromFirestore(taskToDeleteId);
       setTasks(prev => prev.filter(t => t.id !== taskToDeleteId));
       showToast("Đã xóa công việc", "info");
@@ -624,7 +678,7 @@ const App: React.FC = () => {
       addNotification("Đã xóa", "Công việc đã được xóa khỏi danh sách.", "info", false);
     } catch (e) { showToast("Lỗi khi xóa.", "error"); }
     setTaskToDeleteId(null);
-  }, [taskToDeleteId, useFirebase, isOfflineMode, showToast, addNotification]);
+  }, [taskToDeleteId, tasks, useFirebase, isOfflineMode, showToast, addNotification]);
 
   // ==========================================
   // MANUAL SYNC: FETCH FROM TELEGRAM -> ADD TASKS

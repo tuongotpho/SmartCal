@@ -80,3 +80,55 @@ export const addEventToGoogleCalendarAPI = async (task: Task): Promise<GoogleEve
         throw new Error('network_error');
     }
 };
+
+export const updateEventInGoogleCalendarAPI = async (eventId: string, task: Task): Promise<GoogleEvent | null> => {
+    const token = getGoogleAccessToken();
+    if (!token) return null;
+
+    const eventData = buildEventFromTask(task);
+
+    try {
+        const response = await fetch(`${GOOGLE_CALENDAR_API_BASE}/${eventId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(eventData)
+        });
+
+        if (!response.ok) {
+            console.error("Google Calendar Update Error:", await response.text());
+            return null;
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Update Request failed:', error);
+        return null;
+    }
+};
+
+export const deleteEventFromGoogleCalendarAPI = async (eventId: string): Promise<boolean> => {
+    const token = getGoogleAccessToken();
+    if (!token) return false;
+
+    try {
+        const response = await fetch(`${GOOGLE_CALENDAR_API_BASE}/${eventId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            console.error("Google Calendar Delete Error:", await response.text());
+            return false;
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Delete Request failed:', error);
+        return false;
+    }
+};

@@ -37,6 +37,8 @@ export interface Task {
   lunarDay?: number;
   lunarMonth?: number;
   lunarYear?: number;
+  // Sync
+  googleEventId?: string;
 }
 
 export interface TelegramConfig {
