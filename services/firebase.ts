@@ -196,13 +196,13 @@ export const subscribeToTasks = (
         endDate: endDate,
         time: safeString(data.time) || "00:00",
         duration: safeString(data.duration),
-        description: safeString(data.description),
         completed: safeBoolean(data.completed),
         reminderSent: safeBoolean(data.reminderSent),
         recurringType: recType,
         tags: tags,
         subtasks: subtasks,
-        customStatus: data.customStatus
+        customStatus: data.customStatus,
+        googleEventId: safeString(data.googleEventId)
       });
     });
 
@@ -325,6 +325,7 @@ export const addTaskToFirestore = async (task: Omit<Task, 'id'>) => {
       tags: task.tags || ['Khác'], // Save as array
       subtasks: task.subtasks || [],
       customStatus: task.customStatus || 'todo',
+      googleEventId: task.googleEventId || null,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
@@ -360,7 +361,8 @@ export const updateTaskInFirestore = async (task: Task) => {
       recurringType: task.recurringType || 'none',
       tags: (task.tags && task.tags.length > 0) ? task.tags : ['Khác'],
       subtasks: task.subtasks || [],
-      customStatus: task.customStatus || 'todo'
+      customStatus: task.customStatus || 'todo',
+      googleEventId: task.googleEventId || null
     };
 
     // Nếu có color (optional), thêm vào
