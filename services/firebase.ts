@@ -217,7 +217,12 @@ export const subscribeToTasks = (
         tags: tags,
         subtasks: subtasks,
         customStatus: data.customStatus,
-        googleEventId: data.googleEventId || undefined
+        googleEventId: data.googleEventId || undefined,
+        // Lunar calendar fields
+        isLunarDate: safeBoolean(data.isLunarDate),
+        lunarDay: typeof data.lunarDay === 'number' ? data.lunarDay : undefined,
+        lunarMonth: typeof data.lunarMonth === 'number' ? data.lunarMonth : undefined,
+        lunarYear: typeof data.lunarYear === 'number' ? data.lunarYear : undefined,
       });
     });
 
@@ -341,6 +346,11 @@ export const addTaskToFirestore = async (task: Omit<Task, 'id'>) => {
       subtasks: task.subtasks || [],
       customStatus: task.customStatus || 'todo',
       googleEventId: task.googleEventId || null,
+      // Lunar calendar fields
+      isLunarDate: !!(task as any).isLunarDate,
+      lunarDay: (task as any).lunarDay || null,
+      lunarMonth: (task as any).lunarMonth || null,
+      lunarYear: (task as any).lunarYear || null,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
@@ -377,7 +387,12 @@ export const updateTaskInFirestore = async (task: Task) => {
       tags: (task.tags && task.tags.length > 0) ? task.tags : ['Khác'],
       subtasks: task.subtasks || [],
       customStatus: task.customStatus || 'todo',
-      googleEventId: task.googleEventId || null
+      googleEventId: task.googleEventId || null,
+      // Lunar calendar fields
+      isLunarDate: !!task.isLunarDate,
+      lunarDay: task.lunarDay || null,
+      lunarMonth: task.lunarMonth || null,
+      lunarYear: task.lunarYear || null,
     };
 
     // Nếu có color (optional), thêm vào

@@ -153,9 +153,23 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
             time: result.time,
             description: (prev.description ? prev.description + "\n" : "") + (result.description || ""),
             recurringType: (result.recurringType as RecurringType) || 'none',
-            tags: result.tags || ['Khác']
+            tags: result.tags || ['Khác'],
+            ...(result.isLunarDate && {
+              isLunarDate: true,
+              lunarDay: result.lunarDay,
+              lunarMonth: result.lunarMonth,
+              lunarYear: result.lunarYear
+            })
           };
         });
+
+        // Also update local UI state to reflect Lunar Mode immediately if AI returned it
+        if (result.isLunarDate && result.lunarDay && result.lunarMonth) {
+          setIsLunarMode(true);
+          setLunarDay(result.lunarDay);
+          setLunarMonth(result.lunarMonth);
+          setLunarYear(result.lunarYear || new Date().getFullYear());
+        }
         showToast("Đã điền thông tin từ giọng nói!", "success");
         if (results.length > 1) {
           showToast(`AI tìm thấy ${results.length} công việc, chỉ lấy thông tin đầu tiên.`, "info");
@@ -239,7 +253,15 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
     if (newEndDate && newEndDate < newDate) {
       newEndDate = newDate;
     }
-    setFormData({ ...formData, date: newDate, endDate: newEndDate, isLunarDate: false });
+    setFormData({
+      ...formData,
+      date: newDate,
+      endDate: newEndDate,
+      isLunarDate: false,
+      lunarDay: undefined,
+      lunarMonth: undefined,
+      lunarYear: undefined
+    });
   }
 
   // Lunar date change handler
@@ -340,7 +362,25 @@ const EditTaskModal: React.FC<EditTaskModalProps> = ({ isOpen, onClose, task, ta
                       setLunarDay(lunar.day);
                       setLunarMonth(lunar.month);
                       setLunarYear(lunar.year);
+
+                      // Immediately update formData so it saves correctly even if user doesn't touch dropdowns
+                      setFormData({
+                        ...formData,
+                        isLunarDate: true,
+                        lunarDay: lunar.day,
+                        lunarMonth: lunar.month,
+                        lunarYear: lunar.year
+                      });
                     }
+                  } else if (isLunarMode && formData) {
+                    // Switching back to Solar
+                    setFormData({
+                      ...formData,
+                      isLunarDate: false,
+                      lunarDay: undefined,
+                      lunarMonth: undefined,
+                      lunarYear: undefined
+                    });
                   }
                 }}
                 className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${isLunarMode ? 'bg-yellow-500' : 'bg-gray-300 dark:bg-gray-600'

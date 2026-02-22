@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { Task } from "../types";
+import { solarToLunar } from "./lunarService";
 
 // Lấy API key từ localStorage (người dùng tự nhập trong Settings)
 const getGeminiApiKey = (): string => {
@@ -61,6 +62,10 @@ export interface ParsedTaskData {
   description: string;
   recurringType: string;
   tags: string[];
+  isLunarDate?: boolean;
+  lunarDay?: number;
+  lunarMonth?: number;
+  lunarYear?: number;
 }
 
 export const parseTaskWithGemini = async (input: string, availableTags: string[]): Promise<ParsedTaskData[] | null> => {
@@ -81,9 +86,10 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
       1. Xác định TẤT CẢ các sự kiện riêng biệt. Ví dụ: "Thứ 2 làm A, thứ 3 làm B" -> 2 sự kiện.
       2. Nếu không rõ ngày, mặc định là hôm nay.
       3. Nếu không rõ giờ, mặc định 08:00. Chú ý các từ chỉ thời gian: "Sáng" (~08:00), "Trưa" (~12:00), "Chiều" (~14:00 hoặc 15:00), "Tối" (~19:00 - 20:00), "Đêm" (~22:00). Nếu trong câu có nhắc đến "chiều", "chieu" thì MUST gán giờ là 14:00 hoặc 15:00.
-      4. Trả về JSON ARRAY (Kể cả chỉ có 1 sự kiện).
+      4. NẾU người dùng nhắc đến "âm lịch", "ngày âm" hoặc có ý nói ngày âm, hãy set "isLunarDate" là true. VÀ "date" vẫn phải là một String YYYY-MM-DD tương ứng với ngày DƯƠNG LỊCH của ngày âm đó trong năm nay (bạn có thể ước lượng hoặc tôi sẽ tính lại sau, nhưng cứ xuất ra date format chuẩn).
+      5. Trả về JSON ARRAY (Kể cả chỉ có 1 sự kiện).
       
-      Output JSON Schema: Array<{ title: string, date: string (YYYY-MM-DD), time: string (HH:mm), endDate: string, duration: string, description: string, recurringType: string, tags: string[] }>
+      Output JSON Schema: Array<{ title: string, date: string (YYYY-MM-DD), time: string (HH:mm), endDate: string, duration: string, description: string, recurringType: string, isLunarDate: boolean, tags: string[] }>
       `,
       config: {
         responseMimeType: "application/json",
@@ -99,6 +105,7 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
               duration: { type: Type.STRING },
               description: { type: Type.STRING },
               recurringType: { type: Type.STRING, enum: ['none', 'daily', 'weekly', 'monthly', 'yearly'] },
+              isLunarDate: { type: Type.BOOLEAN },
               tags: { type: Type.ARRAY, items: { type: Type.STRING, enum: tagsToUse } }
             },
             required: ["title", "date", "time"]
@@ -114,11 +121,29 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
 
       console.log("Gemini parsed tasks:", tasks); // Debug log
 
-      return tasks.map((t: any) => ({
-        ...t,
-        endDate: t.endDate || t.date,
-        tags: t.tags && t.tags.length > 0 ? t.tags : ['Khác']
-      }));
+      return tasks.map((t: any) => {
+        let extraLunarProps = {};
+        if (t.isLunarDate && t.date) {
+          try {
+            const [y, m, d] = t.date.split("-").map(Number);
+            const lunar = solarToLunar(d, m, y);
+            extraLunarProps = {
+              lunarDay: lunar.day,
+              lunarMonth: lunar.month,
+              lunarYear: lunar.year
+            };
+          } catch (e) {
+            console.warn("Failed to convert solar to lunar in parser", e);
+          }
+        }
+
+        return {
+          ...t,
+          ...extraLunarProps,
+          endDate: t.endDate || t.date,
+          tags: t.tags && t.tags.length > 0 ? t.tags : ['Khác']
+        };
+      });
     }
     return null;
   } catch (error) {

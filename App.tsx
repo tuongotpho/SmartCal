@@ -187,41 +187,6 @@ const App: React.FC = () => {
       hapticFeedback.medium();
       showToast(`Đã xong: ${task.title}`, "success");
       addNotification("Đã hoàn thành", `Chúc mừng bạn đã hoàn thành: ${task.title}`, "success", false);
-
-      // --- LUNAR RECURRENCE LOGIC ---
-      // Nếu task là lịch Âm, lặp lại hàng năm, tạo (spawn) ngay 1 task cho năm sau với ngày Dương chính xác
-      if (task.isLunarDate && task.recurringType === 'yearly' && task.lunarDay && task.lunarMonth) {
-        try {
-          const currentTaskDate = new Date(task.date);
-          const currentSolarYear = currentTaskDate.getFullYear();
-          const nextSolarYear = currentSolarYear + 1;
-
-          const nextSolarDateParams = getLunarAnniversarySolar(task.lunarDay, task.lunarMonth, nextSolarYear);
-
-          // Format lại thành chuỗi YYYY-MM-DD
-          const nextDateStr = format(new Date(nextSolarDateParams.year, nextSolarDateParams.month - 1, nextSolarDateParams.day), 'yyyy-MM-dd');
-
-          // Tạo một task copy
-          const nextTask: Task = {
-            ...task,
-            id: 'temp',
-            date: nextDateStr,
-            endDate: nextDateStr,
-            completed: false,
-            reminderSent: false,
-            pomodoroSessions: 0,
-            googleEventId: undefined, // Xóa id Google Calendar cũ để tạo Event mới
-          };
-
-          // Chèn vào Database (skip check conflic vì đây là nhắc định kỳ)
-          await handleRequestAddTask(nextTask, true);
-          showToast(`Đã tự động tạo lịch báo năm sau: ${nextDateStr}`, "info");
-
-        } catch (error) {
-          console.error("Lỗi khi tạo chu kỳ tái diễn Lịch Âm:", error);
-        }
-      }
-      // -----------------------------
     }
   };
 

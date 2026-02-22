@@ -139,8 +139,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({
               switch (recType) {
                 case 'daily': return true;
                 case 'weekly': return getDay(currentDayStart) === getDay(taskDateStart);
-                case 'monthly': return !task.isLunarDate && getDate(currentDayStart) === getDate(taskDateStart);
-                case 'yearly': return !task.isLunarDate && getDate(currentDayStart) === getDate(taskDateStart) && getMonth(currentDayStart) === getMonth(taskDateStart);
+                case 'monthly':
+                  if (task.isLunarDate && task.lunarDay) {
+                    return parseInt(lunarDay) === task.lunarDay;
+                  }
+                  return getDate(currentDayStart) === getDate(taskDateStart);
+                case 'yearly':
+                  if (task.isLunarDate && task.lunarDay && task.lunarMonth) {
+                    return parseInt(lunarDay) === task.lunarDay && parseInt(lunarMonth) === task.lunarMonth;
+                  }
+                  return getDate(currentDayStart) === getDate(taskDateStart) && getMonth(currentDayStart) === getMonth(taskDateStart);
                 default: return false;
               }
             } else {
