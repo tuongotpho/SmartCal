@@ -222,14 +222,12 @@ exports.pushTaskReminder = functions.pubsub
                         // Gửi FCM Push Notification
                         await messaging.send({
                             token: fcmToken,
-                            notification: {
-                                title: `🔔 ${task.title}`,
-                                body: `${task.time} - ${diff > 0 ? `Còn ${diff} phút` : 'Đã đến giờ!'}`,
-                            },
                             data: {
                                 taskId: taskId,
                                 type: 'TASK_REMINDER',
-                                url: '/'
+                                url: '/',
+                                title: `🔔 ${task.title}`,
+                                body: `${task.time} - ${diff > 0 ? `Còn ${diff} phút` : 'Đã đến giờ!'}`
                             },
                             android: {
                                 notification: {
@@ -250,15 +248,6 @@ exports.pushTaskReminder = functions.pubsub
                                 }
                             },
                             webpush: {
-                                notification: {
-                                    icon: '/icon-192.png',
-                                    badge: '/badge-72.png',
-                                    requireInteraction: true,
-                                    actions: [
-                                        { action: 'open', title: 'Mở' },
-                                        { action: 'dismiss', title: 'Bỏ qua' }
-                                    ]
-                                },
                                 fcmOptions: {
                                     link: '/'
                                 }
@@ -332,13 +321,11 @@ exports.dailyPushReminder = functions.pubsub
             const nextTask = tasks.sort((a, b) => a.time.localeCompare(b.time))[0];
             await messaging.send({
                 token: fcmToken,
-                notification: {
-                    title: `🌅 Chào buổi sáng!`,
-                    body: `Hôm nay bạn có ${taskCount} công việc. Đầu tiên: ${nextTask.title} lúc ${nextTask.time}`,
-                },
                 data: {
                     type: 'DAILY_SUMMARY',
-                    url: '/'
+                    url: '/',
+                    title: `🌅 Chào buổi sáng!`,
+                    body: `Hôm nay bạn có ${taskCount} công việc. Đầu tiên: ${nextTask.title} lúc ${nextTask.time}`
                 },
                 android: {
                     notification: {
