@@ -63,7 +63,7 @@ export const dailyTaskReminder = functions.pubsub
     if (tasksSnapshot.empty) return null;
 
     const userTasksMap: Record<string, Task[]> = {};
-    
+
     tasksSnapshot.forEach((doc) => {
       const task = doc.data() as Task;
       if (task.userId) {
@@ -75,7 +75,7 @@ export const dailyTaskReminder = functions.pubsub
     for (const userId of Object.keys(userTasksMap)) {
       const tasks = userTasksMap[userId];
       const configDoc = await db.doc(`users/${userId}/config/telegram`).get();
-      
+
       if (!configDoc.exists) continue;
 
       const config = configDoc.data() as TelegramConfig;
@@ -104,7 +104,7 @@ export const realtimeTaskReminder = functions.pubsub
     const timeZone = "Asia/Ho_Chi_Minh";
     const zonedDate = utcToZonedTime(now, timeZone);
     const todayStr = format(zonedDate, "yyyy-MM-dd");
-    
+
     // Tính phút hiện tại trong ngày (0 - 1439)
     const currentHours = parseInt(format(zonedDate, "HH"), 10);
     const currentMinutes = parseInt(format(zonedDate, "mm"), 10);
@@ -130,9 +130,9 @@ export const realtimeTaskReminder = functions.pubsub
     for (const doc of tasksSnapshot.docs) {
       const task = doc.data() as Task;
       const taskId = doc.id;
-      
+
       if (!task.time || !task.userId) continue;
-      
+
       // Bỏ qua nếu đã gửi nhắc nhở (reminderSent === true)
       // Lưu ý: task.reminderSent có thể undefined (task cũ), coi như chưa gửi
       if (task.reminderSent === true) continue;
@@ -148,24 +148,24 @@ export const realtimeTaskReminder = functions.pubsub
         // Lấy config Telegram của user
         const configDoc = await db.doc(`users/${task.userId}/config/telegram`).get();
         if (configDoc.exists) {
-            const config = configDoc.data() as TelegramConfig;
-            if (config.botToken && config.chatId) {
-                const msg = `🚨 <b>SẮP ĐẾN HẠN!</b>\n\n📌 <b>${task.title}</b>\n⏰ Thời gian: ${task.time}\n\n👉 <i>Hãy kiểm tra ngay!</i>`;
-                await sendToTelegram(config, msg);
-                
-                // Đánh dấu đã gửi để không gửi lại
-                const taskRef = db.collection("tasks").doc(taskId);
-                batch.update(taskRef, { reminderSent: true });
-                hasUpdates = true;
-                console.log(`Sent reminder for task ${taskId}`);
-            }
+          const config = configDoc.data() as TelegramConfig;
+          if (config.botToken && config.chatId) {
+            const msg = `🚨 <b>SẮP ĐẾN HẠN!</b>\n\n📌 <b>${task.title}</b>\n⏰ Thời gian: ${task.time}\n\n👉 <i>Hãy kiểm tra ngay!</i>`;
+            await sendToTelegram(config, msg);
+
+            // Đánh dấu đã gửi để không gửi lại
+            const taskRef = db.collection("tasks").doc(taskId);
+            batch.update(taskRef, { reminderSent: true });
+            hasUpdates = true;
+            console.log(`Sent reminder for task ${taskId}`);
+          }
         }
       }
     }
 
     if (hasUpdates) {
-        await batch.commit();
-        console.log("Đã cập nhật trạng thái reminderSent cho các task.");
+      await batch.commit();
+      console.log("Đã cập nhật trạng thái reminderSent cho các task.");
     }
 
     return null;
@@ -183,7 +183,7 @@ export const pushTaskReminder = functions.pubsub
     const timeZone = "Asia/Ho_Chi_Minh";
     const zonedDate = utcToZonedTime(now, timeZone);
     const todayStr = format(zonedDate, "yyyy-MM-dd");
-    
+
     const currentHours = parseInt(format(zonedDate, "HH"), 10);
     const currentMinutes = parseInt(format(zonedDate, "mm"), 10);
     const currentTotalMinutes = currentHours * 60 + currentMinutes;
@@ -205,9 +205,9 @@ export const pushTaskReminder = functions.pubsub
     for (const doc of tasksSnapshot.docs) {
       const task = doc.data() as Task;
       const taskId = doc.id;
-      
+
       if (!task.time || !task.userId) continue;
-      
+
       // Bỏ qua nếu đã gửi push (pushSent === true)
       if ((task as any).pushSent === true) continue;
 
@@ -219,24 +219,22 @@ export const pushTaskReminder = functions.pubsub
       if (diff <= 30 && diff >= -15) {
         // Lấy FCM token của user
         const fcmDoc = await db.doc(`users/${task.userId}/config/fcm`).get();
-        
+
         if (fcmDoc.exists) {
           const fcmData = fcmDoc.data();
           const fcmToken = fcmData?.token;
-          
+
           if (fcmToken) {
             try {
               // Gửi FCM Push Notification
               await messaging.send({
                 token: fcmToken,
-                notification: {
-                  title: `🔔 ${task.title}`,
-                  body: `${task.time} - ${diff > 0 ? `Còn ${diff} phút` : 'Đã đến giờ!'}`,
-                },
                 data: {
                   taskId: taskId,
                   type: 'TASK_REMINDER',
-                  url: '/'
+                  url: '/',
+                  title: `🔔 ${task.title}`,
+                  body: `${task.time} - ${diff > 0 ? `Còn ${diff} phút` : 'Đã đến giờ!'}`
                 },
                 android: {
                   notification: {
@@ -257,15 +255,6 @@ export const pushTaskReminder = functions.pubsub
                   }
                 },
                 webpush: {
-                  notification: {
-                    icon: '/icon-192.png',
-                    badge: '/badge-72.png',
-                    requireInteraction: true,
-                    actions: [
-                      { action: 'open', title: 'Mở' },
-                      { action: 'dismiss', title: 'Bỏ qua' }
-                    ]
-                  },
                   fcmOptions: {
                     link: '/'
                   }
@@ -279,10 +268,10 @@ export const pushTaskReminder = functions.pubsub
               console.log(`[Push] Sent to ${fcmToken.substring(0, 20)}... for task ${taskId}`);
             } catch (error: any) {
               console.error(`[Push] Error sending to token:`, error.message);
-              
+
               // Nếu token không hợp lệ, xóa khỏi Firestore
-              if (error.code === 'messaging/registration-token-not-registered' || 
-                  error.code === 'messaging/invalid-registration-token') {
+              if (error.code === 'messaging/registration-token-not-registered' ||
+                error.code === 'messaging/invalid-registration-token') {
                 await db.doc(`users/${task.userId}/config/fcm`).delete();
                 console.log(`[Push] Deleted invalid token for user ${task.userId}`);
               }
@@ -323,7 +312,7 @@ export const dailyPushReminder = functions.pubsub
     if (tasksSnapshot.empty) return null;
 
     const userTasksMap: Record<string, Task[]> = {};
-    
+
     tasksSnapshot.forEach((doc) => {
       const task = doc.data() as Task;
       if (task.userId) {
@@ -334,10 +323,10 @@ export const dailyPushReminder = functions.pubsub
 
     for (const userId of Object.keys(userTasksMap)) {
       const tasks = userTasksMap[userId];
-      
+
       // Lấy FCM token
       const fcmDoc = await db.doc(`users/${userId}/config/fcm`).get();
-      
+
       if (!fcmDoc.exists) continue;
 
       const fcmToken = fcmDoc.data()?.token;
@@ -346,16 +335,14 @@ export const dailyPushReminder = functions.pubsub
       try {
         const taskCount = tasks.length;
         const nextTask = tasks.sort((a, b) => a.time.localeCompare(b.time))[0];
-        
+
         await messaging.send({
           token: fcmToken,
-          notification: {
-            title: `🌅 Chào buổi sáng!`,
-            body: `Hôm nay bạn có ${taskCount} công việc. Đầu tiên: ${nextTask.title} lúc ${nextTask.time}`,
-          },
           data: {
             type: 'DAILY_SUMMARY',
-            url: '/'
+            url: '/',
+            title: `🌅 Chào buổi sáng!`,
+            body: `Hôm nay bạn có ${taskCount} công việc. Đầu tiên: ${nextTask.title} lúc ${nextTask.time}`
           },
           android: {
             notification: {
@@ -365,7 +352,7 @@ export const dailyPushReminder = functions.pubsub
             }
           }
         });
-        
+
         console.log(`[DailyPush] Sent summary to user ${userId}`);
       } catch (error: any) {
         console.error(`[DailyPush] Error:`, error.message);

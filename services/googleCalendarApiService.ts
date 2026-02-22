@@ -238,3 +238,30 @@ export const deleteEventFromGoogleCalendarAPI = async (eventId: string): Promise
         return false;
     }
 };
+
+/**
+ * Lấy các sự kiện Google Calendar đã thay đổi từ thời điểm lastSyncTime
+ * Cần truyền singleEvents=true để nó bung các event lặp ra, hoặc đơn giản lấy sự kiện gốc
+ */
+export const fetchUpdatedGoogleEvents = async (lastSyncTime: string): Promise<any[]> => {
+    const token = getGoogleAccessToken();
+    if (!token) return [];
+
+    try {
+        const url = `${GOOGLE_CALENDAR_API_BASE}?updatedMin=${encodeURIComponent(lastSyncTime)}&showDeleted=true`;
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+            console.warn("Failed to fetch updated GCal events:", await response.text());
+            return [];
+        }
+
+        const data = await response.json();
+        return data.items || [];
+    } catch (error) {
+        console.error('Fetch updated events failed:', error);
+        return [];
+    }
+};

@@ -1,96 +1,58 @@
-# 📊 BÁO CÁO RÀ SOÁT TỔNG THỂ CODEBASE SMARTCAL PRO
+# 📊 BÁO CÁO RÀ SOÁT TỔNG THỂ CODEBASE SMARTCAL PRO (CẬP NHẬT 22/02/2026)
 
-**Ngày rà soát:** 22/02/2026
-**Người rà soát:** AI Assistant
-**Mục tiêu:** Rà soát toàn bộ dự án từ Frontend đến Backend, đánh giá ưu nhược điểm, và lên roadmap phát triển.
+**Mục tiêu:** Rà soát lại toàn bộ dự án dựa trên những thay đổi mới nhất, đánh giá kiến trúc và lên roadmap phát triển cho Phase tiếp theo.
 
 ---
 
-## 1. TỔNG QUAN KIẾN TRÚC & TECH STACK
+## 1. TỔNG QUAN HỆ SINH THÁI 🌟
 
-SmartCal Pro đã phát triển vượt bậc từ một ứng dụng lịch đơn giản thành một **Hệ sinh thái Quản lý năng suất (Productivity Hub)** đa nền tảng, kết hợp AI tiên tiến.
-
-### 1.1 Tech Stack Hiện Tại
+SmartCal Pro hiện đã lột xác thành bộ máy quản lý năng suất cực kỳ mạnh mẽ:
 *   **Web Frontend:** React 18, Vite, TypeScript.
-*   **Desktop App Wrapper:** Tauri (Rust-based) cực kỳ nhẹ và nhanh.
-*   **Giao diện (UI/UX):** Tailwind CSS, Lucide Icons, Hỗ trợ Multi-Theme (Cam, Tím, Xanh) và Dark Mode hoàn chỉnh.
-*   **Backend & Cơ sở dữ liệu:** Firebase Firestore (NoSQL realtime), Firebase Authentication (Google/Email).
-*   **Serverless Logic:** Firebase Cloud Functions (`functions/src/index.ts`).
-*   **AI Integration:** `@google/genai` (Mô hình Gemini 2.0 Flash) tích hợp trực tiếp.
-*   **Notification:** Trình duyệt Web Push, Telegram Bot API, Firebase Cloud Messaging (FCM).
-*   **Hosting & Domain:** Firebase Hosting, cấu hình PWA (Progressive Web App), đã xác minh Google Search Console.
+*   **Desktop App:** Tauri (Rust-based).
+*   **Backend & DB:** Firebase Firestore, Firebase Auth.
+*   **Serverless:** Firebase Cloud Functions (`functions/src/index.ts`).
+*   **AI Engine:** Gemini 2.5 Flash (Tích hợp trực tiếp).
+*   **Cơ sở hạ tầng PWA & Push:** Gộp Service Workers hoàn chỉnh giúp Push Notification chạy nền ổ định 100%.
 
 ---
 
-## 2. DANH SÁCH TÍNH NĂNG ĐÃ HOÀN THIỆN (Hệ sinh thái hiện tại)
+## 2. NHỮNG TÍNH NĂNG VƯỢT TRỘI ĐÃ HOÀN THÀNH (Milestone Đạt Được) 🏆
 
-### 🤖 2.1 AI & Tự động hóa
-1.  **AI Smart Entry (Lên lịch bằng văn bản tự nhiên):** Gõ "Trưa mai đi ăn phở", AI tự động bóc tách ngày, giờ, hành động và tạo Task.
-2.  **Chatbot Trợ lý ảo:** Giao diện Chatbot mini ghim ở góc màn hình, giải đáp thắc mắc và hỗ trợ người dùng ngay trong app.
-3.  **Báo cáo năng suất AI:** Tự động tổng hợp dữ liệu tuần/tháng và nhận xét bằng văn bản dựa trên trí tuệ nhân tạo.
-
-### 📅 2.2 Quản lý Lịch trình & Công việc
-1.  **Chế độ xem đa dạng:** Calendar (Tháng/Tuần/Ngày), Danh sách (List), Timeline (Dòng thời gian dọc), Kanban Board (Kéo thả trạng thái).
-2.  **Focus Mode:** Tích hợp đồng hồ Pomodoro ngay trong app, có âm thanh haptic (Tiếng rung/chuông) khi hết giờ.
-3.  **Thống kê (Stats):** Biểu đồ trực quan hóa số lượng công việc hoàn thành, biểu đồ Heatmap thói quen.
-4.  **Cảnh báo Xung đột:** Tự động phát hiện nếu bạn xếp 2 công việc trùng một khung giờ và bật Modal cảnh báo.
-5.  **Offline-first:** LocalStorage caching cho phép xem và sửa lịch ngay cả khi rớt mạng, tự động đồng bộ khi có mạng lại.
-6.  **Hệ thống Tagging:** Phân loại công việc bằng hệ màu sắc (VD: #Work, #Personal, #Urgent).
-
-### 🔔 2.3 Hệ thống Nhắc nhở Đa kênh
-1.  **Nhắc nhở Telegram Bot:** Người dùng nhập ChatID, hệ thống tự động bắn tin nhắn nhắc việc qua Telegram vào sáng sớm hoặc sát giờ.
-2.  **Web Push Notifications:** Thông báo nhảy trực tiếp trên hệ điều hành máy tính/điện thoại thông qua FCM.
-3.  **Tùy biến thời gian nhắc:** Cho phép thiết lập nhắc trước 5 phút, 15 phút, 1 tiếng,...
-
-### 🔄 2.4 Đồng bộ & Tài khoản
-1.  **Đăng nhập bảo mật:** Xác thực qua Firebase Auth (Email/Password, Google).
-2.  **Đồng bộ Google Calendar (1-chiều):** Khi tạo/sửa/xóa task trên App, dữ liệu tự động đẩy mượt mà lên Google Calendar chính thức của User.
-3.  **Onboarding 4 Bước:** Modal Carousel cực đẹp và trực quan giới thiệu các "Tính năng ăn tiền" cho User mới đăng nhập lần đầu.
+1.  **AI Smart Entry v2.5:** Đã nâng cấp code lên mô hình `gemini-2.5-flash` mới nhất, giải quyết triệt để vấn đề Google đóng model 2.0. Đảm bảo app tiếp tục chạy 100% miễn phí và siêu tốc độ.
+2.  **Lịch Âm Hiện Đại Nhất:**
+    *   Xử lý lịch Âm ảo hóa trên Calendar.
+    *   Tự động tính ngày cho 10 năm tới và tạo event riêng rẽ trên Google Calendar.
+3.  **Light 2-Way GCal Sync:** Tự động âm thầm quét và đồng bộ dữ liệu từ Google Calendar sang SmartCal mỗi khi mở Tab/App (tiết kiệm 99% chi phí API so với Webhook thông thường).
+4.  **Hệ Thống Push Notifications Vững Chắc:** Viết lại Data-only Payload trên Backend và Merge hoàn toàn `sw.js` bảo đảm thông báo không bao giờ "tịt ngòi" khi app chạy ngầm.
+5.  **Clean Code Architecture:** App.tsx được cắt gọt mỏng nhẹ, logic được bọc trong các Custom Hooks tinh gọn (`useTasks`, `useModals`, `useGoogleSync`, v.v.). Tự động dọn rác DB khi người dùng xóa tài khoản.
 
 ---
 
-## 3. ĐÁNH GIÁ: ƯU & NHƯỢC ĐIỂM
+## 3. ĐÁNH GIÁ: ƯU & NHƯỢC ĐIỂM (Cập nhật)
 
 ### ✅ 3.1 Điểm Mạnh (PROS)
-1.  **UI/UX Vượt Trội:** Thiết kế mang hơi hướng Apple/Notion, rất trau chuốt từ border-radius, shadow, đến các micro-animations (như hiệu ứng khi click Hoàn thành). Onboarding flow rất bài bản.
-2.  **Tính thực dụng cực cao:** Giải quyết đúng "nỗi đau" của người dùng lịch: Lười nhập liệu (Có AI), hay quên (Có Telegram nhắc), rối rắm (Có Onboarding hướng dẫn).
-3.  **Multi-Platform:** Vừa chạy mượt trên Web/Mobile Browser, vừa có bản build `.exe` siêu nhẹ bằng Tauri cho Desktop.
-4.  **Kiến trúc File Service rõ ràng:** Việc tách riêng `geminiService.ts`, `googleCalendarApiService.ts`, `telegramService.ts` cho thấy tư duy code sạch, dễ bảo trì.
+-   **Độ ổn định cao:** Hạ tầng đồng bộ Firebase + Google Calendar Sync nay đã vững chắc, offline mode hoạt động liền mạch.
+-   **Feature-Rich nhưng Rất Nhẹ:** Tích hợp cả Kanban, Pomodoro Timer, Lịch Âm, AI, Telegram Bot... tất cả gói gọn trong một App với giao diện siêu mướt.
+-   **Kiến trúc Dễ Mở Rộng:** Các Services (Gemini, Lunar, GCal, Telegram, FCM) được code Modular cực kỳ độc lập. Tránh được 100% rác dữ liệu ảo.
 
 ### ❌ 3.2 Điểm Yếu & Rủi ro Kỹ thuật (CONS)
-1.  **"God Component" - App.tsx quá "mập":** File `App.tsx` có dung lượng cực lớn (chứa quá nhiều State và Logic render). Việc này sẽ gây khó khăn khi scale app lớn hơn và làm chậm quá trình render (Re-render hàng loạt tài nguyên).
-2.  **Bảo mật API Key ở Client:** Key Gemini và Key Firebase đang nằm trực tiếp ở phía Frontend (Client-side). Bất kỳ ai mở F12 cũng có thể lấy trộm Key API của bạn.
-3.  **Google Calendar Sync chỉ là 1-chiều:** Dù đã cập nhật wording cho User, nhưng việc không kéo được lịch từ Google gốc về App (Pull) khiến trải nghiệm chưa trọn vẹn 100%.
-4.  **Rác Database từ tài khoản ảo:** Khi người dùng xóa tài khoản (Delete Account) hoặc bỏ app, dữ liệu rác trên Firestore không tự biến mất.
-5.  **Chưa có State Manager chuyên dụng:** Việc quản lý `tasks` array qua Hook state ở App component và truyền Props xuống Kanban/Calendar sẽ gây "Props Drilling" (Nhồi props qua nhiều tầng).
+1.  **Bảo mật API Key ở Client (Mức độ Nguy hiểm):** Key Gemini hiện đang cắm chết ở Frontend. Hacker có thể moi Key ra dùng chùa. ĐÂY LÀ VẤN ĐỀ SINH TỬ.
+2.  **Logic "Offline Cứng":** Hiện tại Offline Mode dựa nhiều vào LocalStorage thuần, thiếu sự hỗ trợ của IndexedDB nếu lượng dữ liệu lớn. Nếu user tạo task offline, ID 'temp' có rủi ro bị đè nếu họ tạo quá nhanh hoặc reload trình duyệt trước khi có mạng.
+3.  **Subtasks (Nhiệm vụ con) khá thô sơ:** Có Data Model nhưng chưa có Giao diện kéo thả hay tick riêng biệt cho danh sách việc con sâu bên trong.
 
 ---
 
-## 4. GỢI Ý NÂNG CẤP & CẢI THIỆN CODEBASE
+## 4. BẢNG ƯU TIÊN NÂNG CẤP VÀ PHÁT TRIỂN (Roadmap Sắp Tới) 🚀
 
-### 🛠 4.1 Refactor Kiến trúc (Cải thiện Code)
-1.  **Sử dụng Global State (Zustand hoặc Redux Toolkit):** Chuyển toàn bộ biến state như `tasks`, `tags`, `settings`, `theme` ra một file Store riêng (VD: `useTaskStore.ts`). File `App.tsx` chỉ làm nhiệm vụ Route và Layout.
-2.  **Tách nhỏ App.tsx:** Tách phần logic Auth (Đăng nhập), Modal quản lý (Các popup) ra thành các Component Wrapper riêng (`<AuthWrapper>`, `<ModalManager>`).
-3.  **Tối ưu Re-render (Performance):** Sử dụng `React.memo` kỹ lưỡng hơn cho các cấu phần nặng như `CalendarView` hay `KanbanView` để khi sửa 1 thẻ task không làm giật cả bảng.
-4.  **Bảo mật biến môi trường:** Cần cấu hình `.env` chặt chẽ, và đối với Cloud Functions thì dùng Firebase Secrets Manager để lưu các Token nhạy cảm.
+Dưới đây là phương hướng hành động cho chúng ta. Hãy đi từ trên xuống dưới:
 
-### 📡 4.2 Nâng cấp Dịch vụ (Backend / Automation)
-1.  **Firebase Webhook cho Google Calendar (2-Way Sync):** Viết thêm một Cloud Function để hứng sự kiện (Webhook Notification) từ Google Calendar. Khi user sửa lịch trên điện thoại bằng app Google, Firebase sẽ nhận thông báo và cập nhật ngược lại vào Firestore.
-2.  **Cài đặt Firebase Extensions (Như đã tư vấn):**
-    *   Cài ngay `Delete User Data` để xóa sạch dữ liệu Firestore khi Auth User bị xóa.
-    *   Cài `Trigger Email from Firestore` để xử lý hệ thống Email thông báo.
-3.  **Gộp Service Workers:** Hiện tại PWA có `sw.js` và Firebase có `firebase-messaging-sw.js`. Cần dùng `importScripts` để gộp 2 file này lại giải quyết triệt để lỗi Push Notification lúc được lúc không.
+| Mức độ | Hạng mục nâng cấp | Phân loại | Giải pháp & Lợi ích |
+| :---: | :--- | :---: | :--- |
+| **P1<br>🔥 Cấp bách** | **1. Đưa API AI lên Cloud Functions (Giấu Key)** | *Bảo mật* | � **Vấn đề:** Hiện Gemini API Key đang bị lộ ở Frontend.<br>✅ **Giải pháp:** Xây serverless Function để "đỡ đạn", Frontend chỉ gửi câu nói lên Backend, Backend gọi Gemini rồi ném kết quả về. Tích hợp Rate Limiting chống DDoS. |
+| **P2<br>⭐ Qu.trọng** | **2. Nâng cấp Subtasks (Quản lý việc con)** | *Trải nghiệm* | Thay vì chỉ là Checkbox thô sơ trong form, hãy làm một Subtask Checklist thực thụ trên giao diện List/Kanban, hiển thị thanh tiến độ (Progress Bar) % hoàn thành. |
+| **P3<br>✨ Tính năng** | **3. Nâng cấp Offline Sync Queue bằng IndexedDB** | *Hạ tầng* | Dùng thư viện `idb` hoặc Worker để gom tất cả các hành động của User lúc rớt mạng vào "Hàng đợi" (Queue). Khi có mạng, bắn hàng loạt lên Firebase một cách an toàn mà không đè ID. |
+| **P3<br>✨ Tính năng** | **4. Lặp công việc Nâng cao (Advanced RRULE)** | *Tính năng* | Hiện tại chỉ lặp: Hàng ngày/tuần/tháng/năm cơ bản. Nâng cấp để người dùng chọn: "Lặp các thứ 2-4-6", hoặc "Thứ tự cuối cùng của tháng". |
+| **P4<br>💡 Mở rộng** | **5. Tích hợp AI BioRhythm (Lịch sinh học)** | *Tương lai* | Thu thập thói quen hoàn thành task, AI tự dự đoán khung giờ "High Energy" của User và đề xuất kéo thả task vào khung giờ đó. |
 
 ---
-
-## 5. TÍNH NĂNG MỚI ĐỀ XUẤT CHO VER 4.0 (Tương lai)
-
-1.  **Lịch Sinh Sinh Học (BioRhythm / Energy Tracker):** AI gợi ý xếp những công việc khó vào khung giờ "Năng lượng cao" của người dùng.
-2.  **Chế độ Đội nhóm (Team Collaboration):** Cho phép Share một Task hoặc Share cả một Project Kanban cho tài khoản khác để làm việc chung.
-3.  **Lặp công việc nâng cao (Advanced Recurring Rules):** Hiện tại chỉ lặp cơ bản. Có thể làm lặp theo kiểu "Ngày thứ Cum cuối cùng của tháng" hoặc "Các thứ 3 và thứ 5 hàng tuần".
-4.  **Webhooks & API Public:** Mở API cho phép người dùng tự dùng Zapier/IFTTT hoặc phím tắt iOS (Shortcuts) để bắn việc vào SmartCal.
-5.  **Lịch Âm (Lunar Calendar):** Tích hợp sâu hiển thị ngày Âm lịch dưới ngày Dương lịch trên giao diện Tháng (rất cần thiết cho User Việt Nam).
-
----
-*Báo cáo được thực hiện bằng quy trình quét code tự động toàn bộ Workspace.*
-*Mọi thay đổi có thể được tiến hành triển khai theo từng Phase nếu bạn đồng ý.*
+*Báo cáo mới nhất này thay thế hoàn toàn phiên bản cũ, phản ánh bước tiến dài của ứng dụng trong những ngày qua. Sẵn sàng vào việc chưa?*

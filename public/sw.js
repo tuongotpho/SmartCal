@@ -60,13 +60,13 @@ self.addEventListener('activate', event => {
 // Fetch Event
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) {
-      return;
+    return;
   }
 
   // Network First for APIs
   if (event.request.url.includes('firebase') || event.request.url.includes('googleapis') || event.request.url.includes('ai.studio')) {
-      event.respondWith(fetch(event.request));
-      return;
+    event.respondWith(fetch(event.request));
+    return;
   }
 
   // Stale-While-Revalidate
@@ -74,17 +74,17 @@ self.addEventListener('fetch', event => {
     caches.match(event.request)
       .then(cachedResponse => {
         const fetchPromise = fetch(event.request).then(
-           networkResponse => {
-             if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-                const responseToCache = networkResponse.clone();
-                caches.open(CACHE_NAME).then(cache => {
-                   cache.put(event.request, responseToCache);
-                });
-             }
-             return networkResponse;
-           }
+          networkResponse => {
+            if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+              const responseToCache = networkResponse.clone();
+              caches.open(CACHE_NAME).then(cache => {
+                cache.put(event.request, responseToCache);
+              });
+            }
+            return networkResponse;
+          }
         ).catch(() => {
-           // Silent catch
+          // Silent catch
         });
         return cachedResponse || fetchPromise;
       })
@@ -99,9 +99,9 @@ self.addEventListener('fetch', event => {
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Received background message:', payload);
 
-  const notificationTitle = payload.notification?.title || '🔔 SmartCal Nhắc việc';
+  const notificationTitle = payload.data?.title || payload.notification?.title || '🔔 SmartCal Nhắc việc';
   const notificationOptions = {
-    body: payload.notification?.body || 'Bạn có công việc cần làm!',
+    body: payload.data?.body || payload.notification?.body || 'Bạn có công việc cần làm!',
     icon: '/icon-192.png',
     badge: '/badge-72.png',
     tag: payload.data?.taskId || 'smartcal-reminder',
@@ -119,7 +119,7 @@ messaging.onBackgroundMessage((payload) => {
 // Handle notification click
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification clicked:', event);
-  
+
   event.notification.close();
 
   // Xử lý action
@@ -129,7 +129,7 @@ self.addEventListener('notificationclick', (event) => {
 
   // Mở app hoặc focus vào tab hiện có
   const urlToOpen = event.notification.data?.url || '/';
-  
+
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
@@ -160,7 +160,7 @@ self.addEventListener('notificationclose', (event) => {
 // Listen for messages from main app
 self.addEventListener('message', (event) => {
   console.log('[SW] Message from main app:', event.data);
-  
+
   // Handle specific commands
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();

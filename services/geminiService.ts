@@ -80,7 +80,7 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
     const tagsToUse = availableTags.length > 0 ? availableTags : ['Khác'];
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: `Phân tích: "${input}". Hôm nay: ${today}.
       Yêu cầu:
       1. Xác định TẤT CẢ các sự kiện riêng biệt. Ví dụ: "Thứ 2 làm A, thứ 3 làm B" -> 2 sự kiện.
@@ -172,7 +172,7 @@ export const checkProposedTaskConflict = async (proposedTask: Partial<Task>, exi
     if (activeTasks.length === 0) return [];
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: `Check trùng lịch: Việc mới "${proposedTask.title}" lúc ${proposedTask.time} ngày ${proposedTask.date}. Việc hiện có: ${JSON.stringify(activeTasks)}. Trả về JSON mảng string cảnh báo nếu trùng hoặc sát <30p. Trống [] nếu OK.`,
       config: {
         responseMimeType: "application/json",
@@ -196,7 +196,7 @@ export const analyzeScheduleConflicts = async (tasks: Task[]): Promise<string[]>
     if (simpleTasks.length < 2) return [];
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: `Tìm trùng/sát lịch trong 30p: ${JSON.stringify(simpleTasks)}. Trả về JSON mảng string cảnh báo ngắn.`,
       config: {
         responseMimeType: "application/json",
@@ -216,7 +216,7 @@ export const suggestSubtasks = async (taskTitle: string, taskDescription?: strin
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: `Chia nhỏ việc: "${taskTitle}" (${taskDescription || ''}) thành 3-5 bước. Trả về mảng JSON string.`,
       config: {
         responseMimeType: "application/json",
@@ -236,7 +236,7 @@ export const generateReport = async (tasks: Task[], range: string): Promise<stri
   try {
     const tasksData = tasks.map(t => ({ title: t.title, date: t.date, status: t.completed ? "Xong" : "Chưa" }));
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: `Báo cáo năng suất ${range}: ${JSON.stringify(tasksData)}. Trả về HTML (h4, ul, li).`
     });
     return response.text || "";
@@ -252,7 +252,7 @@ export const chatWithCalendar = async (question: string, tasks: Task[]): Promise
   try {
     const simpleTasks = tasks.map(t => ({ title: t.title, date: t.date, time: t.time, status: t.completed ? "Xong" : "Chưa" }));
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: `Thư ký AI. Câu hỏi: "${question}". Dữ liệu: ${JSON.stringify(simpleTasks)}. Trả về HTML.`
     });
     return response.text || "Tôi không hiểu câu hỏi.";

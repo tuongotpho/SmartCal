@@ -31,6 +31,7 @@ import { useTasks } from './hooks/useTasks';
 import { useTelegramSync } from './hooks/useTelegramSync';
 import { useReminders } from './hooks/useReminders';
 import { useModals } from './hooks/useModals';
+import { useGoogleSync } from './hooks/useGoogleSync';
 
 export const APP_THEMES: AppTheme[] = [
   {
@@ -121,6 +122,9 @@ const App: React.FC = () => {
     isDeleteModalOpen, setIsDeleteModalOpen, taskToDeleteId, setTaskToDeleteId,
     showOnboarding, closeOnboarding, isAIOpen, setIsAIOpen
   } = useModals();
+
+  // 5. Automatic Google Calendar Light 2-Way Sync
+  useGoogleSync(user, isOfflineMode, tasks);
 
   // Auth Listener
   useEffect(() => {
