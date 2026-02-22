@@ -403,3 +403,69 @@ export const deleteTaskFromFirestore = async (id: string) => {
     throw e;
   }
 };
+
+/**
+ * Xóa toàn bộ dữ liệu của người dùng và Xóa Tài Khoản
+ * Thực hiện tuần tự: Xóa Tasks -> Xóa Config -> Xóa Tài khoản
+ */
+export const deleteUserAccountAndData = async () => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Chưa đăng nhập.");
+
+  const uid = currentUser.uid;
+
+  try {
+    // 1. Xóa tất cả Tasks của user
+    const tasksSnapshot = await db.collection(COLLECTION_NAME).where('userId', '==', uid).get();
+    const batch = db.batch();
+
+    tasksSnapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    // Nếu có quá nhiều tasks, thực tế nên dùng pagination delete.
+    // Với app cá nhân, batch (< 500 ops) thường là đủ.
+    if (!tasksSnapshot.empty) {
+      await batch.commit();
+      console.log(`Đã xóa ${tasksSnapshot.docs.length} tasks.`);
+    }
+
+    // 2. Xóa các file cấu hình (Tags, Telegram, fcm)
+    const configPath = db.collection(USERS_COLLECTION).doc(uid).collection("config");
+
+    const tagsDoc = await configPath.doc("tags").get();
+    if (tagsDoc.exists) await configPath.doc("tags").delete();
+
+    const telegramDoc = await configPath.doc("telegram").get();
+    if (telegramDoc.exists) await configPath.doc("telegram").delete();
+
+    // 3. Xóa FCM token nếu có (Mặc dù nó nằm trong users/{uid}/fcm_tokens)
+    const fcmPath = db.collection(USERS_COLLECTION).doc(uid).collection("fcm_tokens");
+    const fcmSnapshot = await fcmPath.get();
+    const fcmBatch = db.batch();
+    fcmSnapshot.docs.forEach((doc) => {
+      fcmBatch.delete(doc.ref);
+    });
+    if (!fcmSnapshot.empty) {
+      await fcmBatch.commit();
+      console.log(`Đã xóa FCM tokens.`);
+    }
+
+    // Cuối cùng: Xóa Document chính của User (nếu có)
+    const userDoc = await db.collection(USERS_COLLECTION).doc(uid).get();
+    if (userDoc.exists) await userDoc.ref.delete();
+
+    // 4. Xóa User Auth Account
+    await currentUser.delete();
+    console.log("Đã xóa tài khoản Firebase Auth thành công.");
+
+    return true;
+  } catch (error: any) {
+    console.error("Lỗi khi dọn rác và xóa tài khoản:", error);
+    // Nếu lỗi là 'auth/requires-recent-login', ném lại để UI xử lý thông báo cho user đăng nhập lại
+    if (error.code === 'auth/requires-recent-login') {
+      throw new Error("requires-recent-login");
+    }
+    throw error;
+  }
+};

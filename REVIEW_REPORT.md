@@ -1,328 +1,96 @@
-# 📊 BÁO CÁO RÀ SOÁT SMARTCAL
+# 📊 BÁO CÁO RÀ SOÁT TỔNG THỂ CODEBASE SMARTCAL PRO
 
-**Ngày rà soát:** 19/02/2026  
-**Phiên bản:** v2.8.0
-
----
-
-## 1. TỔNG QUAN ỨNG DỤNG
-
-### 1.1 Mô tả
-SmartCal là ứng dụng quản lý công việc thông minh với tích hợp AI (Gemini), hỗ trợ:
-- Quản lý công việc đa dạng (Task Management)
-- Tích hợp Telegram Bot để nhắc việc
-- Đồng bộ dữ liệu qua Firebase
-- Hỗ trợ PWA (Progressive Web App)
-- Nhiều chế độ xem: Calendar, Kanban, Timeline, Focus, Stats
-
-### 1.2 Tech Stack
-| Thành phần | Công nghệ |
-|------------|-----------|
-| Frontend | React 18 + TypeScript + Vite |
-| Backend | Firebase Firestore + Cloud Functions |
-| AI | Google Gemini API |
-| Notifications | Telegram Bot API + Browser Notifications |
-| Styling | Tailwind CSS |
-| PWA | Service Worker + Web App Manifest |
+**Ngày rà soát:** 22/02/2026
+**Người rà soát:** AI Assistant
+**Mục tiêu:** Rà soát toàn bộ dự án từ Frontend đến Backend, đánh giá ưu nhược điểm, và lên roadmap phát triển.
 
 ---
 
-## 2. TÍNH NĂNG HIỆN CÓ
+## 1. TỔNG QUAN KIẾN TRÚC & TECH STACK
 
-### 2.1 Quản lý Công việc ✅
-- [x] Tạo/Sửa/Xóa công việc
-- [x] Thiết lập ngày giờ, thời lượng
-- [x] Công việc lặp lại (daily/weekly/monthly/yearly)
-- [x] Phân loại bằng Tags (nhiều tag cho 1 task)
-- [x] Subtasks/Checklist
-- [x] Đánh dấu hoàn thành
-- [x] Ghi chú/Mô tả
+SmartCal Pro đã phát triển vượt bậc từ một ứng dụng lịch đơn giản thành một **Hệ sinh thái Quản lý năng suất (Productivity Hub)** đa nền tảng, kết hợp AI tiên tiến.
 
-### 2.2 Chế độ Xem ✅
-- [x] **MONTH** - Lịch tháng
-- [x] **WEEK** - Lịch tuần
-- [x] **DAY** - Lịch ngày
-- [x] **LIST** - Danh sách công việc
-- [x] **KANBAN** - Bảng Kanban (Todo/In Progress/Done)
-- [x] **TIMELINE** - Dòng thời gian
-- [x] **FOCUS** - Pomodoro Timer
-- [x] **STATS** - Thống kê năng suất
-
-### 2.3 Tích hợp AI ✅
-- [x] Nhập công việc bằng ngôn ngữ tự nhiên
-- [x] Phát hiện xung đột lịch trình
-- [x] Gợi ý chia nhỏ công việc (Subtasks)
-- [x] Tạo báo cáo năng suất
-- [x] Chatbot trợ lý ảo
-
-### 2.4 Nhắc việc ✅
-- [x] Browser Notifications
-- [x] Telegram Bot Messages
-- [x] Cloud Functions (Server-side reminders)
-  - Daily reminder lúc 6:00 AM
-  - Realtime reminder mỗi 5 phút
-
-### 2.5 Đồng bộ & Lưu trữ ✅
-- [x] Firebase Authentication (Google, Email)
-- [x] Firestore Database
-- [x] Offline Mode với LocalStorage
-- [x] Đồng bộ Telegram Config lên Cloud
-
-### 2.6 Giao diện ✅
-- [x] Dark Mode
-- [x] Multi-theme (Orange, Blue, Purple)
-- [x] Responsive Design
-- [x] Mobile Navigation
-- [x] Pull-to-refresh
+### 1.1 Tech Stack Hiện Tại
+*   **Web Frontend:** React 18, Vite, TypeScript.
+*   **Desktop App Wrapper:** Tauri (Rust-based) cực kỳ nhẹ và nhanh.
+*   **Giao diện (UI/UX):** Tailwind CSS, Lucide Icons, Hỗ trợ Multi-Theme (Cam, Tím, Xanh) và Dark Mode hoàn chỉnh.
+*   **Backend & Cơ sở dữ liệu:** Firebase Firestore (NoSQL realtime), Firebase Authentication (Google/Email).
+*   **Serverless Logic:** Firebase Cloud Functions (`functions/src/index.ts`).
+*   **AI Integration:** `@google/genai` (Mô hình Gemini 2.0 Flash) tích hợp trực tiếp.
+*   **Notification:** Trình duyệt Web Push, Telegram Bot API, Firebase Cloud Messaging (FCM).
+*   **Hosting & Domain:** Firebase Hosting, cấu hình PWA (Progressive Web App), đã xác minh Google Search Console.
 
 ---
 
-## 3. ĐÁNH GIÁ CHẤT LƯỢNG CODE
+## 2. DANH SÁCH TÍNH NĂNG ĐÃ HOÀN THIỆN (Hệ sinh thái hiện tại)
 
-### 3.1 Điểm Mạnh 💪
+### 🤖 2.1 AI & Tự động hóa
+1.  **AI Smart Entry (Lên lịch bằng văn bản tự nhiên):** Gõ "Trưa mai đi ăn phở", AI tự động bóc tách ngày, giờ, hành động và tạo Task.
+2.  **Chatbot Trợ lý ảo:** Giao diện Chatbot mini ghim ở góc màn hình, giải đáp thắc mắc và hỗ trợ người dùng ngay trong app.
+3.  **Báo cáo năng suất AI:** Tự động tổng hợp dữ liệu tuần/tháng và nhận xét bằng văn bản dựa trên trí tuệ nhân tạo.
 
-| Khía cạnh | Đánh giá | Chi tiết |
-|-----------|----------|----------|
-| **Cấu trúc** | ⭐⭐⭐⭐ | Tách biệt rõ ràng: components, services, types |
-| **TypeScript** | ⭐⭐⭐⭐ | Type definitions đầy đủ trong types.ts |
-| **React Patterns** | ⭐⭐⭐⭐ | Sử dụng Hooks, useCallback, useMemo hiệu quả |
-| **Error Handling** | ⭐⭐⭐ | Có try-catch, fallback cho AI failures |
-| **UX/UI** | ⭐⭐⭐⭐⭐ | Giao diện đẹp, animations mượt, dark mode |
-| **PWA** | ⭐⭐⭐⭐ | Service Worker, manifest, installable |
-| **Realtime** | ⭐⭐⭐⭐⭐ | Firestore onSnapshot cho sync realtime |
+### 📅 2.2 Quản lý Lịch trình & Công việc
+1.  **Chế độ xem đa dạng:** Calendar (Tháng/Tuần/Ngày), Danh sách (List), Timeline (Dòng thời gian dọc), Kanban Board (Kéo thả trạng thái).
+2.  **Focus Mode:** Tích hợp đồng hồ Pomodoro ngay trong app, có âm thanh haptic (Tiếng rung/chuông) khi hết giờ.
+3.  **Thống kê (Stats):** Biểu đồ trực quan hóa số lượng công việc hoàn thành, biểu đồ Heatmap thói quen.
+4.  **Cảnh báo Xung đột:** Tự động phát hiện nếu bạn xếp 2 công việc trùng một khung giờ và bật Modal cảnh báo.
+5.  **Offline-first:** LocalStorage caching cho phép xem và sửa lịch ngay cả khi rớt mạng, tự động đồng bộ khi có mạng lại.
+6.  **Hệ thống Tagging:** Phân loại công việc bằng hệ màu sắc (VD: #Work, #Personal, #Urgent).
 
-### 3.2 Điểm Yếu & Vấn đề ⚠️
+### 🔔 2.3 Hệ thống Nhắc nhở Đa kênh
+1.  **Nhắc nhở Telegram Bot:** Người dùng nhập ChatID, hệ thống tự động bắn tin nhắn nhắc việc qua Telegram vào sáng sớm hoặc sát giờ.
+2.  **Web Push Notifications:** Thông báo nhảy trực tiếp trên hệ điều hành máy tính/điện thoại thông qua FCM.
+3.  **Tùy biến thời gian nhắc:** Cho phép thiết lập nhắc trước 5 phút, 15 phút, 1 tiếng,...
 
-| Vấn đề | Mức độ | File | Mô tả |
-|--------|--------|------|-------|
-| **Firebase Config Hardcoded** | 🔴 Cao | firebase.ts:7-15 | API keys lộ trong source code |
-| **API Key Exposure** | 🔴 Cao | geminiService.ts:5 | `process.env.API_KEY` không an toàn cho client |
-| **No Input Validation** | 🟡 TB | EditTaskModal.tsx | Thiết lập validation cơ bản |
-| **No Unit Tests** | 🟡 TB | - | Không có test files |
-| **Large Components** | 🟡 TB | App.tsx (577 lines) | Nên tách nhỏ hơn |
-| **Missing Error Boundaries** | 🟢 Thấp | - | Chỉ có 1 ErrorBoundary component |
-| **No Rate Limiting** | 🟡 TB | geminiService.ts | AI calls không có throttle |
-| **Memory Leaks Risk** | 🟡 TB | App.tsx | Một số useEffect cần cleanup tốt hơn |
-
-### 3.3 Vấn đề Bảo mật
-
-```
-🔴 CRITICAL: Firebase config exposed in client code
-- File: services/firebase.ts
-- Risk: Bất kỳ ai cũng có thể đọc được config từ bundle
-- Solution: Sử dụng Firebase App Check hoặc environment variables
-
-🔴 CRITICAL: Gemini API Key in client
-- File: services/geminiService.ts
-- Risk: API key có thể bị đánh cắp và sử dụng sai mục đích
-- Solution: Gọi AI qua Cloud Functions backend
-```
+### 🔄 2.4 Đồng bộ & Tài khoản
+1.  **Đăng nhập bảo mật:** Xác thực qua Firebase Auth (Email/Password, Google).
+2.  **Đồng bộ Google Calendar (1-chiều):** Khi tạo/sửa/xóa task trên App, dữ liệu tự động đẩy mượt mà lên Google Calendar chính thức của User.
+3.  **Onboarding 4 Bước:** Modal Carousel cực đẹp và trực quan giới thiệu các "Tính năng ăn tiền" cho User mới đăng nhập lần đầu.
 
 ---
 
-## 4. ROADMAP NÂNG CẤP
+## 3. ĐÁNH GIÁ: ƯU & NHƯỢC ĐIỂM
 
-### Phase 1: Bảo mật & Ổn định (1-2 tuần) 🔐
+### ✅ 3.1 Điểm Mạnh (PROS)
+1.  **UI/UX Vượt Trội:** Thiết kế mang hơi hướng Apple/Notion, rất trau chuốt từ border-radius, shadow, đến các micro-animations (như hiệu ứng khi click Hoàn thành). Onboarding flow rất bài bản.
+2.  **Tính thực dụng cực cao:** Giải quyết đúng "nỗi đau" của người dùng lịch: Lười nhập liệu (Có AI), hay quên (Có Telegram nhắc), rối rắm (Có Onboarding hướng dẫn).
+3.  **Multi-Platform:** Vừa chạy mượt trên Web/Mobile Browser, vừa có bản build `.exe` siêu nhẹ bằng Tauri cho Desktop.
+4.  **Kiến trúc File Service rõ ràng:** Việc tách riêng `geminiService.ts`, `googleCalendarApiService.ts`, `telegramService.ts` cho thấy tư duy code sạch, dễ bảo trì.
 
-| Task | Mức độ | Mô tả |
-|------|--------|-------|
-| Move API Keys to Backend | 🔴 Critical | Di chuyển Gemini API key sang Cloud Functions |
-| Firebase App Check | 🔴 Critical | Implement App Check để ngăn chặn abuse |
-| Environment Variables | 🟡 Medium | Sử dụng .env cho config nhạy cảm |
-| Error Monitoring | 🟡 Medium | Tích hợp Sentry hoặc LogRocket |
-| Input Sanitization | 🟡 Medium | Validate và sanitize user input |
-
-### Phase 2: Tính năng Mới (2-4 tuần) ✨
-
-| Tính năng | Mô tả | Độ ưu tiên |
-|-----------|-------|------------|
-| **Recurring Tasks Logic** | Tự động tạo task mới theo chu kỳ | 🔴 Cao |
-| **Push Notifications** | Web Push cho mobile | 🔴 Cao |
-| **Task Templates** | Mẫu công việc có sẵn | 🟡 TB |
-| **Collaboration** | Chia sẻ task với người khác | 🟡 TB |
-| **Calendar Sync** | Đồng bộ 2 chiều với Google Calendar | 🟡 TB |
-| **Voice Commands** | Điều khiển bằng giọng nói | 🟢 Thấp |
-| **Smart Suggestions** | AI gợi ý thời gian tối ưu | 🟢 Thấp |
-
-### Phase 3: Cải thiện UX (2-3 tuần) 🎨
-
-| Cải thiện | Mô tả |
-|-----------|-------|
-| **Onboarding Flow** | Hướng dẫn người dùng mới |
-| **Keyboard Shortcuts** | Phím tắt cho power users |
-| **Drag & Drop** | Kéo thả task giữa các ngày |
-| **Bulk Actions** | Chọn nhiều task cùng lúc |
-| **Advanced Search** | Tìm kiếm với filters |
-| **Export/Import** | Xuất/nhập dữ liệu (JSON, CSV) |
-
-### Phase 4: Performance & Scale (1-2 tuần) ⚡
-
-| Task | Mô tả |
-|------|-------|
-| **Code Splitting** | Lazy load các view components |
-| **Firestore Indexes** | Tối ưu queries |
-| **Caching Strategy** | Cache AI responses |
-| **Bundle Optimization** | Giảm bundle size |
-| **Service Worker Updates** | Caching strategy tốt hơn |
-
-### Phase 5: Mobile App (4-6 tuần) 📱
-
-| Platform | Mô tả |
-|----------|-------|
-| **React Native** | Native mobile app |
-| **Offline First** | Hoạt động hoàn toàn offline |
-| **Background Sync** | Đồng bộ khi app ở background |
-| **Native Notifications** | Push notifications native |
+### ❌ 3.2 Điểm Yếu & Rủi ro Kỹ thuật (CONS)
+1.  **"God Component" - App.tsx quá "mập":** File `App.tsx` có dung lượng cực lớn (chứa quá nhiều State và Logic render). Việc này sẽ gây khó khăn khi scale app lớn hơn và làm chậm quá trình render (Re-render hàng loạt tài nguyên).
+2.  **Bảo mật API Key ở Client:** Key Gemini và Key Firebase đang nằm trực tiếp ở phía Frontend (Client-side). Bất kỳ ai mở F12 cũng có thể lấy trộm Key API của bạn.
+3.  **Google Calendar Sync chỉ là 1-chiều:** Dù đã cập nhật wording cho User, nhưng việc không kéo được lịch từ Google gốc về App (Pull) khiến trải nghiệm chưa trọn vẹn 100%.
+4.  **Rác Database từ tài khoản ảo:** Khi người dùng xóa tài khoản (Delete Account) hoặc bỏ app, dữ liệu rác trên Firestore không tự biến mất.
+5.  **Chưa có State Manager chuyên dụng:** Việc quản lý `tasks` array qua Hook state ở App component và truyền Props xuống Kanban/Calendar sẽ gây "Props Drilling" (Nhồi props qua nhiều tầng).
 
 ---
 
-## 5. CHI TIẾT TÍNH NĂNG ĐỀ XUẤT
+## 4. GỢI Ý NÂNG CẤP & CẢI THIỆN CODEBASE
 
-### 5.1 Recurring Tasks Logic (Ưu tiên cao)
+### 🛠 4.1 Refactor Kiến trúc (Cải thiện Code)
+1.  **Sử dụng Global State (Zustand hoặc Redux Toolkit):** Chuyển toàn bộ biến state như `tasks`, `tags`, `settings`, `theme` ra một file Store riêng (VD: `useTaskStore.ts`). File `App.tsx` chỉ làm nhiệm vụ Route và Layout.
+2.  **Tách nhỏ App.tsx:** Tách phần logic Auth (Đăng nhập), Modal quản lý (Các popup) ra thành các Component Wrapper riêng (`<AuthWrapper>`, `<ModalManager>`).
+3.  **Tối ưu Re-render (Performance):** Sử dụng `React.memo` kỹ lưỡng hơn cho các cấu phần nặng như `CalendarView` hay `KanbanView` để khi sửa 1 thẻ task không làm giật cả bảng.
+4.  **Bảo mật biến môi trường:** Cần cấu hình `.env` chặt chẽ, và đối với Cloud Functions thì dùng Firebase Secrets Manager để lưu các Token nhạy cảm.
 
-**Vấn đề hiện tại:** 
-- Task có field `recurringType` nhưng không có logic tự động tạo task mới
-
-**Giải pháp:**
-```typescript
-// Thêm Cloud Function mới
-export const generateRecurringTasks = functions.pubsub
-  .schedule("0 0 * * *") // Chạy mỗi đêm
-  .timeZone("Asia/Ho_Chi_Minh")
-  .onRun(async (context) => {
-    const today = new Date();
-    const todayStr = format(today, "yyyy-MM-dd");
-    
-    // Tìm các task recurring có date = today
-    const recurringTasks = await db
-      .collection("tasks")
-      .where("date", "==", todayStr)
-      .where("recurringType", "in", ["daily", "weekly", "monthly", "yearly"])
-      .get();
-    
-    // Tạo task mới cho lần tiếp theo
-    for (const doc of recurringTasks.docs) {
-      const task = doc.data();
-      const nextDate = calculateNextDate(task.date, task.recurringType);
-      
-      // Kiểm tra xem task cho nextDate đã tồn tại chưa
-      // Nếu chưa, tạo mới
-    }
-  });
-```
-
-### 5.2 Web Push Notifications
-
-**Lợi ích:**
-- Hoạt động ngay cả khi tab đóng
-- Không cần Telegram
-- Native experience
-
-**Implementation:**
-```typescript
-// Sử dụng Firebase Cloud Messaging
-import { getMessaging, onMessage } from "firebase/messaging";
-
-// Request permission
-const messaging = getMessaging();
-getToken(messaging, { vapidKey: "YOUR_VAPID_KEY" });
-
-// Subscribe to topics
-subscribeToTopic(userId);
-```
-
-### 5.3 Task Collaboration
-
-**Features:**
-- Share task với email
-- Real-time collaboration
-- Comments & Activity log
-- Assignee management
-
-**Data Model:**
-```typescript
-interface SharedTask extends Task {
-  sharedWith: string[]; // emails
-  owner: string;
-  assignees: string[];
-  comments: Comment[];
-  activityLog: Activity[];
-}
-```
+### 📡 4.2 Nâng cấp Dịch vụ (Backend / Automation)
+1.  **Firebase Webhook cho Google Calendar (2-Way Sync):** Viết thêm một Cloud Function để hứng sự kiện (Webhook Notification) từ Google Calendar. Khi user sửa lịch trên điện thoại bằng app Google, Firebase sẽ nhận thông báo và cập nhật ngược lại vào Firestore.
+2.  **Cài đặt Firebase Extensions (Như đã tư vấn):**
+    *   Cài ngay `Delete User Data` để xóa sạch dữ liệu Firestore khi Auth User bị xóa.
+    *   Cài `Trigger Email from Firestore` để xử lý hệ thống Email thông báo.
+3.  **Gộp Service Workers:** Hiện tại PWA có `sw.js` và Firebase có `firebase-messaging-sw.js`. Cần dùng `importScripts` để gộp 2 file này lại giải quyết triệt để lỗi Push Notification lúc được lúc không.
 
 ---
 
-## 6. KẾT LUẬN
+## 5. TÍNH NĂNG MỚI ĐỀ XUẤT CHO VER 4.0 (Tương lai)
 
-### 6.1 Điểm số tổng thể
-
-| Tiêu chí | Điểm | Ghi chú |
-|----------|------|---------|
-| Tính năng | 8/10 | Đầy đủ, cần bổ sung recurring logic |
-| Giao diện | 9/10 | Đẹp, responsive, dark mode |
-| Bảo mật | 5/10 | Cần cải thiện gấp API keys |
-| Performance | 7/10 | Tốt, có thể tối ưu thêm |
-| Code Quality | 7/10 | Cần tests và refactoring |
-| **Tổng** | **7.2/10** | Ứng dụng tiềm năng |
-
-### 6.2 Ưu tiên hành động
-
-1. **🔴 NGAY LẬP TỨC:** Di chuyển API keys sang backend
-2. **🟠 TRONG TUẦN:** Implement recurring tasks logic
-3. **🟡 TRONG THÁNG:** Thêm Web Push Notifications
-4. **🟢 SAU ĐÓ:** Collaboration features, Mobile app
+1.  **Lịch Sinh Sinh Học (BioRhythm / Energy Tracker):** AI gợi ý xếp những công việc khó vào khung giờ "Năng lượng cao" của người dùng.
+2.  **Chế độ Đội nhóm (Team Collaboration):** Cho phép Share một Task hoặc Share cả một Project Kanban cho tài khoản khác để làm việc chung.
+3.  **Lặp công việc nâng cao (Advanced Recurring Rules):** Hiện tại chỉ lặp cơ bản. Có thể làm lặp theo kiểu "Ngày thứ Cum cuối cùng của tháng" hoặc "Các thứ 3 và thứ 5 hàng tuần".
+4.  **Webhooks & API Public:** Mở API cho phép người dùng tự dùng Zapier/IFTTT hoặc phím tắt iOS (Shortcuts) để bắn việc vào SmartCal.
+5.  **Lịch Âm (Lunar Calendar):** Tích hợp sâu hiển thị ngày Âm lịch dưới ngày Dương lịch trên giao diện Tháng (rất cần thiết cho User Việt Nam).
 
 ---
-
-*Báo cáo được tạo tự động bởi AI Code Review*
-
----
-
-## 7. CHI TIẾT RÀ SOÁT TÍNH NĂNG THÔNG BÁO (MỚI)
-
-**Ngày rà soát:** 20/02/2026
-
-### 7.1 Hiện trạng triển khai
-Hệ thống hiện tại đang sử dụng song song 2 cơ chế thông báo:
-1. **Browser Notification (Local):**
-   - Sử dụng `new Notification()` trực tiếp trong `App.tsx` (dòng 248).
-   - Dùng để nhắc việc khi ứng dụng đang mở (Foreground).
-
-2. **Web Push Notification (FCM):**
-   - Backend (`functions/src/index.ts`) đã có logic gửi FCM message (cron job 6:00 AM & realtime check).
-   - Client (`services/fcmService.ts`) đã có logic xin quyền, lấy token và lưu vào Firestore.
-   - Service Worker (`public/firebase-messaging-sw.js`) đã được tạo để xử lý background message.
-
-### 7.2 Vấn đề phát hiện
-1. **Xung đột Service Worker (Quan trọng):**
-   - `index.html` đăng ký `/sw.js` (Caching SW).
-   - Firebase SDK (`fcmService.ts`) mặc định sẽ thử đăng ký `/firebase-messaging-sw.js`.
-   - **Hệ quả:** Trình duyệt có thể chỉ chạy 1 trong 2 SW trên cùng scope root (`/`), dẫn đến việc **Caching hoạt động nhưng Push không nhận được** (hoặc ngược lại).
-   
-2. **Logic FCM chưa hoàn thiện:**
-   - Trong `fcmService.ts`, hàm `getToken` được gọi mà không truyền `serviceWorkerRegistration`. Điều này khiến Firebase tự tạo registration riêng cho `firebase-messaging-sw.js`, gây xung đột với `sw.js` hiện có.
-
-3. **Backend Logic:**
-   - Cloud Functions đang gửi message với payload có cả `notification` và `data` fields. Điều này tốt, nhưng cần đảm bảo SW xử lý đúng `onBackgroundMessage`.
-
-### 7.3 Đề xuất cải thiện (Action Plan)
-Để tính năng Web Push hoạt động ổn định, cần thực hiện:
-
-1. **Merge Service Workers:**
-   - Tích hợp code từ `firebase-messaging-sw.js` vào `sw.js`.
-   - Chỉ đăng ký duy nhất `sw.js` trong `index.html`.
-   - Cập nhật `fcmService.ts` để sử dụng SW registration đã có:
-     ```typescript
-     const registration = await navigator.serviceWorker.ready;
-     const token = await getToken(messaging, { 
-       vapidKey: VAPID_KEY,
-       serviceWorkerRegistration: registration 
-     });
-     ```
-
-2. **Kiểm tra UX xin quyền:**
-   - Hiện tại `App.tsx` xin quyền ngay khi load app (`Notification.requestPermission()`). Nên chuyển sang kích hoạt bằng hành động người dùng (nút "Bật thông báo") để tránh bị chặn tự động bởi trình duyệt.
-
-3. **Xử lý Click thông báo:**
-   - `sw.js` (hoặc `firebase-messaging-sw.js`) cần xử lý sự kiện `notificationclick` để focus vào tab đang mở thay vì luôn mở cửa sổ mới (đã có code xử lý này trong `firebase-messaging-sw.js` nhưng cần đảm bảo nó được chạy).
-
+*Báo cáo được thực hiện bằng quy trình quét code tự động toàn bộ Workspace.*
+*Mọi thay đổi có thể được tiến hành triển khai theo từng Phase nếu bạn đồng ý.*

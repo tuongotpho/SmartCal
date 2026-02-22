@@ -1,47 +1,12 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import {
-  format,
-  addMonths,
-  addWeeks,
-  addDays,
-  getDay,
-  getDate,
-  getMonth,
-  endOfWeek,
-  isWithinInterval,
-  endOfMonth,
-  differenceInDays,
-  differenceInMinutes,
-  isSameDay,
-  parseISO,
-  startOfWeek,
-  startOfMonth,
-  addMinutes
-} from 'date-fns';
-import {
-  RefreshCw,
-  WifiOff,
-  LayoutGrid,
-  Columns,
-  Square,
-  PieChart,
-  Layout,
-  X,
-  Kanban,
-  GanttChartSquare,
-  ArrowDown,
-  Timer,
-  AlertTriangle
-} from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { format, addMonths } from 'date-fns';
+import { RefreshCw, Timer } from 'lucide-react';
+
 import CalendarView from './components/CalendarView';
 import StatsView from './components/StatsView';
-import SettingsModal from './components/SettingsModal';
-import EditTaskModal from './components/EditTaskModal';
-import ConfirmModal from './components/ConfirmModal';
-import ConflictWarningModal from './components/ConflictWarningModal';
 import LoginScreen from './components/LoginScreen';
 import AiAssistant from './components/AiAssistant';
-import Toast, { ToastMessage, ToastType } from './components/Toast';
+import Toast from './components/Toast';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import MobileNavigation from './components/MobileNavigation';
@@ -49,18 +14,23 @@ import DashboardView from './components/DashboardView';
 import KanbanView from './components/KanbanView';
 import TimelineView from './components/TimelineView';
 import FocusView from './components/FocusView';
-import ReminderModal from './components/ReminderModal';
-import OnboardingModal from './components/OnboardingModal';
+import ModalsContainer from './components/ModalsContainer';
 
-import { Task, TelegramConfig, ViewMode, Tag, DEFAULT_TASK_TAGS, RecurringType, AppTheme, AppNotification } from './types';
-import { parseTaskWithGemini, generateReport, checkProposedTaskConflict } from './services/geminiService';
-import { sendTelegramMessage, fetchTelegramUpdates, formatTaskForTelegram, formatNewTaskForTelegram } from './services/telegramService';
-import { subscribeToTasks, subscribeToTags, saveTagsToFirestore, addTaskToFirestore, deleteTaskFromFirestore, updateTaskInFirestore, auth, logOut, saveTelegramConfigToFirestore } from './services/firebase';
+import { AppTheme, ViewMode, TelegramConfig, Task } from './types';
+import { auth, logOut, saveTelegramConfigToFirestore } from './services/firebase';
 import { hapticFeedback } from './services/hapticService';
-import { initializeFCM, onForegroundMessage, checkFCMSupport, FCMConfig } from './services/fcmService';
-import { soundService } from './services/soundService';
-import { addEventToGoogleCalendarAPI, updateEventInGoogleCalendarAPI, deleteEventFromGoogleCalendarAPI } from './services/googleCalendarApiService';
-import { getGoogleAccessToken } from './services/firebase';
+import { generateReport } from './services/geminiService';
+import { getLunarAnniversarySolar } from './services/lunarService';
+
+// Custom Hooks
+import { useNotifications } from './hooks/useNotifications';
+import { useTheme } from './hooks/useTheme';
+import { usePWA } from './hooks/usePWA';
+import { useFCM } from './hooks/useFCM';
+import { useTasks } from './hooks/useTasks';
+import { useTelegramSync } from './hooks/useTelegramSync';
+import { useReminders } from './hooks/useReminders';
+import { useModals } from './hooks/useModals';
 
 export const APP_THEMES: AppTheme[] = [
   {
@@ -93,85 +63,35 @@ export const APP_THEMES: AppTheme[] = [
 ];
 
 const App: React.FC = () => {
+  // 1. Auth & App Core State
   const [user, setUser] = useState<any>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [useFirebase, setUseFirebase] = useState(true);
+
+  // 2. View State
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.MONTH);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => localStorage.getItem('theme') === 'dark');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [currentTheme, setCurrentTheme] = useState<string>(() => localStorage.getItem('app_theme') || 'orange');
-  const [tags, setTags] = useState<Tag[]>(DEFAULT_TASK_TAGS);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [pullY, setPullY] = useState(0);
-  const startY = useRef(0);
-  // In-memory snooze map: taskId -> snoozedUntil (timestamp). Lives in ref so interval always reads latest without re-registering.
-  const snoozedTasksRef = useRef<Map<string, number>>(new Map());
-  const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchActive, setIsSearchActive] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [taskToDeleteId, setTaskToDeleteId] = useState<string | null>(null);
+
+  // 3. AI Report State
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [aiReport, setAiReport] = useState<string | null>(null);
-  const [useFirebase, setUseFirebase] = useState(true);
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    try {
-      const saved = localStorage.getItem('notifications');
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  });
 
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [lastTelegramUpdateId, setLastTelegramUpdateId] = useState<number>(() => {
-    return parseInt(localStorage.getItem('lastTelegramUpdateId') || '0');
-  });
+  // 4. Custom Hooks
+  const { isDarkMode, toggleTheme, currentTheme, setCurrentTheme } = useTheme(APP_THEMES);
+  const { toasts, notifications, showToast, removeToast, addNotification, markAllNotificationsAsRead, clearAllNotifications, markNotificationAsRead } = useNotifications();
+  const { deferredPrompt, handleInstallClick } = usePWA(showToast);
+  const { fcmConfig, setFcmConfig } = useFCM(user, isOfflineMode, showToast, addNotification);
 
-  // PWA Install Prompt State
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-
-  // FCM State
-  const [fcmConfig, setFcmConfig] = useState<FCMConfig>({ enabled: false, token: null });
-
-  // Reminder Modal State
-  const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
-  const [reminderTask, setReminderTask] = useState<Task | null>(null);
-
-  // Onboarding State
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    return localStorage.getItem('hasSeenOnboarding') !== 'true';
-  });
-
-  const closeOnboarding = useCallback(() => {
-    setShowOnboarding(false);
-    localStorage.setItem('hasSeenOnboarding', 'true');
-  }, []);
-
-  // Reminder Settings (thời gian nhắc trước, mặc định 60 phút)
-  const [reminderMinutesBefore, setReminderMinutesBefore] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem('reminder_minutes_before');
-      return saved ? parseInt(saved) : 60;
-    } catch {
-      return 60;
-    }
-  });
-
-  // Pre-save conflict states (Keep these for the Popup)
-  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
-  const [proposedTask, setProposedTask] = useState<Task | null>(null);
-  const [pendingConflicts, setPendingConflicts] = useState<string[]>([]);
-  // AI Assistant open state (for mobile nav)
-  const [isAIOpen, setIsAIOpen] = useState(false);
-
+  // Telegram config lives here so it can be passed around
   const [telegramConfig, setTelegramConfig] = useState<TelegramConfig>(() => {
     try {
       const saved = localStorage.getItem('telegramConfig');
@@ -181,62 +101,44 @@ const App: React.FC = () => {
     }
   });
 
-  const addNotification = useCallback((title: string, message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info', withSound = true) => {
-    const newNotif: AppNotification = {
-      id: Date.now().toString() + Math.random().toString(),
-      title,
-      message,
-      time: new Date().toISOString(),
-      read: false,
-      type
-    };
-    setNotifications(prev => {
-      const updated = [newNotif, ...prev].slice(0, 50); // Keep last 50
-      localStorage.setItem('notifications', JSON.stringify(updated));
-      return updated;
+  const {
+    tasks, tags, setTags, isConflictModalOpen, setIsConflictModalOpen,
+    proposedTask, setProposedTask, pendingConflicts, saveTaskToDatabase,
+    handleRequestAddTask, handleUpdateTask, executeDeleteTask
+  } = useTasks(user, isOfflineMode, useFirebase, telegramConfig, showToast, addNotification, setUseFirebase);
+
+  const { isSyncing, handleManualSync } = useTelegramSync(
+    user, isOfflineMode, telegramConfig, tags, handleRequestAddTask, showToast, addNotification
+  );
+
+  const {
+    reminderMinutesBefore, setReminderMinutesBefore, isReminderModalOpen, reminderTask,
+    handleReminderClose, handleReminderSnooze, handleReminderComplete
+  } = useReminders(tasks, telegramConfig, addNotification, showToast, handleUpdateTask);
+
+  const {
+    isSettingsOpen, setIsSettingsOpen, isEditModalOpen, setIsEditModalOpen, editingTask, setEditingTask,
+    isDeleteModalOpen, setIsDeleteModalOpen, taskToDeleteId, setTaskToDeleteId,
+    showOnboarding, closeOnboarding, isAIOpen, setIsAIOpen
+  } = useModals();
+
+  // Auth Listener
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+      setIsAuthLoading(false);
+      if (currentUser) {
+        setIsOfflineMode(false);
+        setUseFirebase(true);
+      }
     });
-
-    // Play Sound
-    if (withSound) {
-      soundService.play();
-    }
-  }, []);
-
-  const markAllNotificationsAsRead = useCallback(() => {
-    setNotifications(prev => {
-      const updated = prev.map(n => ({ ...n, read: true }));
-      localStorage.setItem('notifications', JSON.stringify(updated));
-      return updated;
-    });
-  }, []);
-
-  const clearAllNotifications = useCallback(() => {
-    setNotifications([]);
-    localStorage.setItem('notifications', JSON.stringify([]));
-  }, []);
-
-  const markNotificationAsRead = useCallback((id: string) => {
-    setNotifications(prev => {
-      const updated = prev.map(n => n.id === id ? { ...n, read: true } : n);
-      localStorage.setItem('notifications', JSON.stringify(updated));
-      return updated;
-    });
-  }, []);
-
-  const showToast = useCallback((message: string, type: ToastType = 'info') => {
-    const id = Date.now().toString() + Math.random().toString();
-    setToasts((prev) => [...prev, { id, message, type }]);
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    return () => unsubscribe();
   }, []);
 
   // Request Notification Permission on Load
   useEffect(() => {
     const requestNotifPermission = async () => {
       if ((window as any).__TAURI_INTERNALS__) {
-        // Tauri: dùng native notification plugin
         try {
           const invoke = (window as any).__TAURI_INTERNALS__.invoke;
           const granted = await invoke('plugin:notification|is_permission_granted');
@@ -251,98 +153,10 @@ const App: React.FC = () => {
     requestNotifPermission();
   }, []);
 
-  // ==========================================
-  // FCM INITIALIZATION
-  // ==========================================
-  useEffect(() => {
-    if (!user || isOfflineMode) return;
-
-    const initFCM = async () => {
-      const supported = await checkFCMSupport();
-      if (!supported) {
-        console.log("FCM không được hỗ trợ");
-        return;
-      }
-
-      const result = await initializeFCM(user.uid);
-      setFcmConfig(result);
-
-      if (result.enabled) {
-        showToast("Đã bật thông báo Push!", "success");
-      }
-    };
-
-    initFCM();
-  }, [user, isOfflineMode, showToast]);
-
-  // Listen for foreground FCM messages
-  useEffect(() => {
-    if (!fcmConfig.enabled) return;
-
-    const unsubscribe = onForegroundMessage((payload) => {
-      console.log("Received FCM message:", payload);
-
-      // Show toast notification & Add to Notification Center
-      if (payload.notification) {
-        const title = payload.notification.title || "Thông báo mới";
-        const body = payload.notification.body || "";
-
-        showToast(`${title}: ${body}`, 'info');
-        addNotification(title, body, 'info', true);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [fcmConfig.enabled, showToast, addNotification]);
-
-
-
-  // PWA Install Event Listener
-  useEffect(() => {
-    const handler = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  const handleInstallClick = useCallback(async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
-      showToast("Đang cài đặt ứng dụng...", "success");
-    }
-  }, [deferredPrompt, showToast]);
-
-  useEffect(() => {
-    const themeObj = APP_THEMES.find(t => t.name === currentTheme) || APP_THEMES[0];
-    const root = document.documentElement;
-    Object.entries(themeObj.colors).forEach(([shade, rgb]) => {
-      root.style.setProperty(`--color-primary-${shade}`, rgb);
-    });
-    localStorage.setItem('app_theme', currentTheme);
-  }, [currentTheme]);
-
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      setUser(currentUser);
-      setIsAuthLoading(false);
-      if (currentUser) {
-        setIsOfflineMode(false);
-        setUseFirebase(true);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const root = window.document.documentElement;
-    if (isDarkMode) root.classList.add('dark'); else root.classList.remove('dark');
-    localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
-  }, [isDarkMode]);
+  // Pull to refresh logic
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullY, setPullY] = useState(0);
+  const startY = useRef(0);
 
   const handleTouchStart = (e: React.TouchEvent) => { if (window.scrollY === 0) startY.current = e.touches[0].clientY; };
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -364,6 +178,53 @@ const App: React.FC = () => {
     startY.current = 0;
   };
 
+  const handleToggleComplete = async (task: any) => {
+    const nextState = !task.completed;
+    const updated = { ...task, completed: nextState };
+    await handleUpdateTask(updated, false);
+
+    if (nextState) {
+      hapticFeedback.medium();
+      showToast(`Đã xong: ${task.title}`, "success");
+      addNotification("Đã hoàn thành", `Chúc mừng bạn đã hoàn thành: ${task.title}`, "success", false);
+
+      // --- LUNAR RECURRENCE LOGIC ---
+      // Nếu task là lịch Âm, lặp lại hàng năm, tạo (spawn) ngay 1 task cho năm sau với ngày Dương chính xác
+      if (task.isLunarDate && task.recurringType === 'yearly' && task.lunarDay && task.lunarMonth) {
+        try {
+          const currentTaskDate = new Date(task.date);
+          const currentSolarYear = currentTaskDate.getFullYear();
+          const nextSolarYear = currentSolarYear + 1;
+
+          const nextSolarDateParams = getLunarAnniversarySolar(task.lunarDay, task.lunarMonth, nextSolarYear);
+
+          // Format lại thành chuỗi YYYY-MM-DD
+          const nextDateStr = format(new Date(nextSolarDateParams.year, nextSolarDateParams.month - 1, nextSolarDateParams.day), 'yyyy-MM-dd');
+
+          // Tạo một task copy
+          const nextTask: Task = {
+            ...task,
+            id: 'temp',
+            date: nextDateStr,
+            endDate: nextDateStr,
+            completed: false,
+            reminderSent: false,
+            pomodoroSessions: 0,
+            googleEventId: undefined, // Xóa id Google Calendar cũ để tạo Event mới
+          };
+
+          // Chèn vào Database (skip check conflic vì đây là nhắc định kỳ)
+          await handleRequestAddTask(nextTask, true);
+          showToast(`Đã tự động tạo lịch báo năm sau: ${nextDateStr}`, "info");
+
+        } catch (error) {
+          console.error("Lỗi khi tạo chu kỳ tái diễn Lịch Âm:", error);
+        }
+      }
+      // -----------------------------
+    }
+  };
+
   const filteredTasks = useMemo(() => {
     let result = tasks;
     if (selectedTagFilter) result = result.filter(t => (t.tags || ['Khác']).includes(selectedTagFilter));
@@ -373,442 +234,6 @@ const App: React.FC = () => {
     }
     return result;
   }, [tasks, selectedTagFilter, searchQuery]);
-
-  const effectiveUserId = user ? user.uid : (isOfflineMode ? 'offline_user' : null);
-  useEffect(() => {
-    if (!effectiveUserId) return;
-    let unsubscribe: () => void;
-    if (useFirebase && !isOfflineMode) {
-      unsubscribe = subscribeToTasks(effectiveUserId, (fetchedTasks) => setTasks(fetchedTasks), (error) => setUseFirebase(false));
-    } else {
-      const saved = localStorage.getItem(isOfflineMode ? 'offlineTasks' : 'localTasks');
-      if (saved) try { setTasks(JSON.parse(saved)); } catch (e) { setTasks([]); }
-    }
-    return () => unsubscribe && unsubscribe();
-  }, [useFirebase, effectiveUserId, isOfflineMode]);
-
-  useEffect(() => {
-    if (!effectiveUserId) return;
-    let unsubscribeTags: () => void;
-    if (useFirebase && !isOfflineMode) {
-      unsubscribeTags = subscribeToTags(effectiveUserId, (fetchedTags) => setTags(fetchedTags), (error) => { });
-    } else {
-      const saved = localStorage.getItem(isOfflineMode ? 'offlineTags' : 'localTags');
-      if (saved) try { setTags(JSON.parse(saved)); } catch (e) { setTags(DEFAULT_TASK_TAGS); }
-    }
-    return () => unsubscribeTags && unsubscribeTags();
-  }, [useFirebase, effectiveUserId, isOfflineMode]);
-
-  const saveTaskToDatabase = useCallback(async (task: Task) => {
-    if (useFirebase && !isOfflineMode) {
-      try {
-        let taskToSave = { ...task };
-        const hasGoogleToken = !!getGoogleAccessToken();
-        let googleStatusMsg = "";
-
-        if (task.id === 'temp') {
-          // Xóa ID tạm để Firestore tự gen thật
-          const taskDataForFirestore = { ...taskToSave };
-          delete (taskDataForFirestore as any).id;
-
-          if (hasGoogleToken) {
-            try {
-              const gEvent = await addEventToGoogleCalendarAPI(taskToSave);
-              if (gEvent && gEvent.id) {
-                taskDataForFirestore.googleEventId = gEvent.id;
-                googleStatusMsg = " & GCal";
-              }
-            } catch (e) {
-              console.warn("Failed to auto-sync create to Google Calendar", e);
-            }
-          }
-
-          const newId = await addTaskToFirestore(taskDataForFirestore);
-          taskToSave.id = newId; // Gắn ID thật vào để truyền đi báo Cáo hoặc Sync
-
-          showToast(`Đã thêm công việc mới${googleStatusMsg}`, "success");
-        } else {
-
-          if (hasGoogleToken) {
-            try {
-              if (taskToSave.googleEventId) {
-                await updateEventInGoogleCalendarAPI(taskToSave.googleEventId, taskToSave);
-                googleStatusMsg = " & GCal";
-              } else {
-                // Trường hợp task cũ chưa có link, nhưng giờ có token, ta tạo link mới luôn
-                const gEvent = await addEventToGoogleCalendarAPI(taskToSave);
-                if (gEvent && gEvent.id) {
-                  taskToSave.googleEventId = gEvent.id;
-                  googleStatusMsg = " & GCal Lần đầu";
-                }
-              }
-            } catch (e) {
-              console.warn("Failed to auto-sync update to Google Calendar", e);
-            }
-          }
-          await updateTaskInFirestore(taskToSave);
-          showToast(`Đã lưu thay đổi${googleStatusMsg}`, "success");
-        }
-      } catch (e) {
-        showToast("Lỗi đồng bộ Cloud", "warning");
-      }
-    } else {
-      if (task.id === 'temp') {
-        setTasks(prev => [...prev, { ...task, id: Date.now().toString() }]);
-        showToast("Đã thêm (Offline)", "success");
-      } else {
-        setTasks(prev => prev.map(t => t.id === task.id ? task : t));
-        showToast("Đã lưu (Offline)", "success");
-      }
-    }
-  }, [useFirebase, isOfflineMode, showToast]);
-
-  const handleRequestAddTask = useCallback(async (task: Task, skipCheck = false) => {
-    hapticFeedback.medium();
-
-    if (skipCheck) {
-      await saveTaskToDatabase(task);
-    } else {
-      // AI Check Conflict BEFORE adding
-      const conflictList = await checkProposedTaskConflict(task, tasks);
-      if (conflictList.length > 0) {
-        setPendingConflicts(conflictList);
-        setProposedTask(task);
-        setIsConflictModalOpen(true);
-        hapticFeedback.warning();
-        return; // Don't proceed to save or notify if conflict exists
-      }
-      await saveTaskToDatabase(task);
-    }
-
-    // Gửi thông báo Telegram khi tạo mới (nếu có config)
-    // Chạy cho cả trường hợp skipCheck (Import từ Telegram/QuickAdd) và normal add
-    if (task.id === 'temp') {
-      addNotification("Tạo mới thành công", `Đã thêm công việc: ${task.title}`, "success");
-
-      if (telegramConfig.botToken && telegramConfig.chatId) {
-        try {
-          const msg = formatNewTaskForTelegram(task);
-          await sendTelegramMessage(telegramConfig, msg);
-          console.log("Sent Telegram notification for new task:", task.title);
-        } catch (error) {
-          console.error("Failed to send creation notification to Telegram", error);
-        }
-      }
-    }
-  }, [tasks, saveTaskToDatabase, addNotification]);
-
-  const handleUpdateTask = useCallback(async (updatedTask: Task, notify = true) => {
-    // Only check conflict for updates if time/date changed AND it's not just a reminder flag update
-    const oldTask = tasks.find(t => t.id === updatedTask.id);
-    const isReminderUpdate = oldTask && oldTask.reminderSent !== updatedTask.reminderSent && oldTask.time === updatedTask.time;
-
-    if (!isReminderUpdate && oldTask && (oldTask.date !== updatedTask.date || oldTask.time !== updatedTask.time)) {
-      const conflictList = await checkProposedTaskConflict(updatedTask, tasks.filter(t => t.id !== updatedTask.id));
-      if (conflictList.length > 0) {
-        setPendingConflicts(conflictList);
-        setProposedTask(updatedTask);
-        setIsConflictModalOpen(true);
-        return;
-      }
-    }
-
-    setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
-
-    // Save to persistence
-    if (useFirebase && !isOfflineMode) {
-      try {
-        const hasGoogleToken = !!getGoogleAccessToken();
-        let googleStatusMsg = "";
-
-        if (hasGoogleToken) {
-          try {
-            if (updatedTask.googleEventId) {
-              await updateEventInGoogleCalendarAPI(updatedTask.googleEventId, updatedTask);
-              googleStatusMsg = " & GCal";
-            } else {
-              const gEvent = await addEventToGoogleCalendarAPI(updatedTask);
-              if (gEvent && gEvent.id) {
-                updatedTask.googleEventId = gEvent.id;
-                googleStatusMsg = " & GCal Lần đầu";
-              }
-            }
-          } catch (e) {
-            console.warn("Failed to auto-sync update to Google Calendar", e);
-          }
-        }
-        await updateTaskInFirestore(updatedTask);
-        if (notify) showToast(`Đã lưu thay đổi${googleStatusMsg}`, "success");
-      } catch (e) {
-        if (notify) showToast("Lỗi cập nhật", "warning");
-      }
-    } else {
-      // Offline persistence
-      if (isOfflineMode) {
-        const newTasks = tasks.map(t => t.id === updatedTask.id ? updatedTask : t);
-        localStorage.setItem('offlineTasks', JSON.stringify(newTasks));
-        if (notify) showToast("Đã lưu (Offline)", "success");
-      }
-    }
-  }, [tasks, useFirebase, isOfflineMode, showToast]);
-
-  // ==========================================
-  // LOGIC NHẮC VIỆC & TELEGRAM (REALTIME)
-  // ==========================================
-  useEffect(() => {
-    if (!tasks || tasks.length === 0) return;
-
-    // Chạy kiểm tra mỗi 30 giây
-    const checkInterval = setInterval(async () => {
-      const now = new Date();
-
-      for (const task of tasks) {
-        // Bỏ qua nếu đã xong
-        if (task.completed) continue;
-
-        // Kiểm tra Snooze TRƯỚC (ưu tiên cao hơn reminderSent)
-        const snoozedUntil = snoozedTasksRef.current.get(task.id);
-        let snoozeJustExpired = false;
-        if (snoozedUntil) {
-          if (now.getTime() < snoozedUntil) {
-            continue; // Chưa hết giờ ngủ, bỏ qua
-          } else {
-            // Snooze vừa hết hạn: dọn map, cho phép nhắc lại dù reminderSent = true
-            snoozedTasksRef.current.delete(task.id);
-            snoozeJustExpired = true;
-          }
-        }
-
-        // Bỏ qua nếu đã nhắc — TRỪ KHI snooze vừa hết
-        if (task.reminderSent && !snoozeJustExpired) continue;
-
-        // Parse thời gian task
-        const taskDateTime = parseISO(`${task.date}T${task.time}`);
-        if (isNaN(taskDateTime.getTime())) continue;
-
-        const diffInMinutes = differenceInMinutes(taskDateTime, now);
-
-        // Điều kiện nhắc: Còn <= reminderMinutesBefore phút và chưa quá giờ
-        const shouldRemind = isSameDay(taskDateTime, now) &&
-          diffInMinutes <= reminderMinutesBefore &&
-          diffInMinutes > 0;
-
-        if (shouldRemind) {
-          // 1. Hiển thị Reminder Modal & Notification Center
-          setReminderTask(task);
-          setIsReminderModalOpen(true);
-          // Don't play sound in addNotification here because ReminderModal handles looping sound
-          addNotification(
-            `Sắp đến hạn: ${task.title}`,
-            `${task.time} - ${task.description || 'Không có mô tả'}`,
-            'warning',
-            false
-          );
-
-          // 2. Gửi Browser / Native Notification
-          if ((window as any).__TAURI_INTERNALS__) {
-            try {
-              const invoke = (window as any).__TAURI_INTERNALS__.invoke;
-              await invoke('plugin:notification|notify', {
-                body: `${task.time} - ${task.description || 'Không có mô tả'}`,
-                title: `🔔 Sắp đến hạn: ${task.title}`
-              });
-            } catch (e) {
-              console.warn('Tauri notification failed:', e);
-            }
-          } else if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(`🔔 Sắp đến hạn: ${task.title}`, {
-              body: `${task.time} - ${task.description || 'Không có mô tả'}`,
-              icon: '/icon.png'
-            });
-          }
-
-          // 3. Gửi Telegram Message (Nếu có cấu hình)
-          if (telegramConfig.botToken && telegramConfig.chatId) {
-            const msg = formatTaskForTelegram(task);
-            await sendTelegramMessage(telegramConfig, msg);
-          }
-
-          // 4. Cập nhật flag reminderSent = true để không nhắc lại
-          const updatedTask = { ...task, reminderSent: true };
-          await handleUpdateTask(updatedTask, false);
-          console.log(`Đã gửi nhắc nhở cho task: ${task.title}`);
-        }
-      }
-    }, 30 * 1000); // 30 giây check 1 lần
-
-    return () => clearInterval(checkInterval);
-  }, [tasks, telegramConfig, reminderMinutesBefore, addNotification, handleUpdateTask]);
-
-  const handleToggleComplete = useCallback(async (task: Task) => {
-    const nextState = !task.completed;
-    const updated = { ...task, completed: nextState };
-    await handleUpdateTask(updated, false);
-
-    if (nextState) {
-      hapticFeedback.medium();
-      showToast(`Đã xong: ${task.title}`, "success");
-      // Notify completion
-      addNotification("Đã hoàn thành", `Chúc mừng bạn đã hoàn thành: ${task.title}`, "success", false); // No sound for completion, just helpful
-    }
-  }, [useFirebase, isOfflineMode, showToast, addNotification]);
-
-  // Handler cho Reminder Modal
-  const handleReminderClose = useCallback(() => {
-    setIsReminderModalOpen(false);
-    setReminderTask(null);
-  }, []);
-
-  const handleReminderSnooze = useCallback((minutes: number) => {
-    if (reminderTask) {
-      // Lưu thời gian "ngủ đông" trong bộ nhớ (ref) — KHÔNG dùng Firestore để tránh race condition với real-time listener
-      snoozedTasksRef.current.set(reminderTask.id, Date.now() + minutes * 60000);
-      showToast(`Sẽ nhắc lại sau ${minutes} phút`, "info");
-      addNotification("Hoãn nhắc nhở", `Đã hoãn việc "${reminderTask.title}" thêm ${minutes} phút.`, "info", false);
-    }
-    setIsReminderModalOpen(false);
-    setReminderTask(null);
-  }, [reminderTask, showToast, addNotification]);
-
-  const handleReminderComplete = useCallback(async () => {
-    if (reminderTask) {
-      const updatedTask = { ...reminderTask, completed: true };
-      await handleUpdateTask(updatedTask, false);
-      showToast(`Đã hoàn thành: ${reminderTask.title}`, "success");
-      addNotification("Đã hoàn thành", `Chúc mừng bạn đã hoàn thành: ${reminderTask.title}`, "success");
-    }
-    setIsReminderModalOpen(false);
-    setReminderTask(null);
-  }, [reminderTask, handleUpdateTask, showToast, addNotification]);
-
-  const executeDeleteTask = useCallback(async () => {
-    if (!taskToDeleteId) return;
-    try {
-      const taskToDelete = tasks.find(t => t.id === taskToDeleteId);
-
-      // Auto-Sync: Xóa trên Google Calendar nếu có googleEventId
-      if (taskToDelete && taskToDelete.googleEventId && !!getGoogleAccessToken()) {
-        try {
-          await deleteEventFromGoogleCalendarAPI(taskToDelete.googleEventId);
-        } catch (e) {
-          console.warn("Failed to delete event from Google Calendar", e);
-        }
-      }
-
-      if (useFirebase && !isOfflineMode) await deleteTaskFromFirestore(taskToDeleteId);
-      setTasks(prev => prev.filter(t => t.id !== taskToDeleteId));
-      showToast("Đã xóa công việc", "info");
-
-      // Notify deletion
-      addNotification("Đã xóa", "Công việc đã được xóa khỏi danh sách.", "info", false);
-    } catch (e) { showToast("Lỗi khi xóa.", "error"); }
-    setTaskToDeleteId(null);
-  }, [taskToDeleteId, tasks, useFirebase, isOfflineMode, showToast, addNotification]);
-
-  // ==========================================
-  // MANUAL SYNC: FETCH FROM TELEGRAM -> ADD TASKS
-  // ==========================================
-  const handleManualSync = useCallback(async (isSilent = false) => {
-    if (!telegramConfig.botToken) {
-      if (!isSilent) showToast("Chưa cấu hình Bot Token", "warning");
-      return;
-    }
-
-    // Nếu đang sync thì thôi, tránh chồng chéo
-    if (isSyncing) return; // Note: isSyncing ref might be better here to avoid dependency change, but let's stick to simple fix first
-
-    setIsSyncing(true);
-
-    try {
-      // 1. Lấy tin nhắn mới nhất (dựa trên offset)
-      const updates = await fetchTelegramUpdates(telegramConfig, lastTelegramUpdateId + 1);
-
-      if (updates.length > 0) {
-        let addedCount = 0;
-        let maxId = lastTelegramUpdateId;
-        const availableTags = tags.map(t => t.name);
-
-        for (const update of updates) {
-          if (update.update_id > maxId) maxId = update.update_id;
-
-          // 2. Dùng AI phân tích
-          console.log("Processing update:", update.message);
-          // Rate limit: Wait 1s between Gemini calls if needed, but important for Tele updates loop
-          const parsedTasks = await parseTaskWithGemini(update.message, availableTags);
-
-          if (parsedTasks && parsedTasks.length > 0) {
-            for (const taskData of parsedTasks) {
-              const newTask: Task = {
-                id: "temp",
-                userId: user?.uid || (isOfflineMode ? 'offline_user' : undefined),
-                title: taskData.title,
-                date: taskData.date,
-                endDate: taskData.endDate || taskData.date,
-                time: taskData.time,
-                duration: taskData.duration || "",
-                description: `Import từ Telegram: "${update.message}"`,
-                completed: false,
-                reminderSent: false,
-                recurringType: (taskData.recurringType as RecurringType) || 'none',
-                tags: taskData.tags || ['Khác'],
-                subtasks: []
-              };
-
-              console.log("Adding task from Telegram:", newTask.title);
-              await handleRequestAddTask(newTask, true);
-              addedCount++;
-
-              // Rate limit: Delay 1s between adds to avoid hitting Telegram "send message" limit
-              await new Promise(res => setTimeout(res, 1000));
-            }
-          } else {
-            console.warn("AI returned no tasks for message:", update.message);
-          }
-          // Delay between messages
-          await new Promise(res => setTimeout(res, 500));
-        }
-
-        // Lưu offset mới
-        setLastTelegramUpdateId(maxId);
-        localStorage.setItem('lastTelegramUpdateId', maxId.toString());
-
-        if (addedCount > 0) {
-          const msg = `Đã đồng bộ ${addedCount} công việc từ Telegram!`;
-          showToast(msg, "success");
-          addNotification("Đồng bộ Telegram", msg, "success");
-        } else if (!isSilent) {
-          showToast("Có tin nhắn nhưng AI không nhận dạng được lịch.", "info");
-        }
-      } else if (!isSilent) {
-        showToast("Không có tin nhắn mới trên Telegram.", "info");
-      }
-    } catch (e) {
-      console.error("Sync error", e);
-      if (!isSilent) {
-        showToast("Lỗi kết nối Telegram (Many Requests?).", "error");
-        addNotification("Lỗi Đồng bộ", "Không thể kết nối Telegram. Vui lòng thử lại sau.", "error");
-      }
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [telegramConfig, lastTelegramUpdateId, tags, handleRequestAddTask, showToast, isSyncing, user, isOfflineMode]);
-
-  // Use a ref to store the latest sync function ensures useEffect doesn't reset interval
-  const savedSyncCallback = useRef(handleManualSync);
-  useEffect(() => {
-    savedSyncCallback.current = handleManualSync;
-  }, [handleManualSync]);
-
-  // Auto-Sync Effect
-  useEffect(() => {
-    if (!telegramConfig.botToken || !telegramConfig.chatId) return;
-
-    const intervalId = setInterval(() => {
-      savedSyncCallback.current(true); // Silent sync
-    }, 60 * 1000); // 60 seconds
-
-    return () => clearInterval(intervalId);
-  }, [telegramConfig]); // Only restart if config changes
 
   const renderContent = () => {
     switch (viewMode) {
@@ -835,13 +260,12 @@ const App: React.FC = () => {
     >
       <Toast toasts={toasts} onRemove={removeToast} />
 
-      {/* Header with Install Logic passed down */}
       <Header
         currentDate={currentDate} setCurrentDate={setCurrentDate} getHeaderText={format(currentDate, viewMode === ViewMode.DAY ? 'dd/MM/yyyy' : 'MM/yyyy')}
         onPrev={() => setCurrentDate(prev => addMonths(prev, -1))} onNext={() => setCurrentDate(prev => addMonths(prev, 1))}
         searchQuery={searchQuery} setSearchQuery={setSearchQuery} isSearchActive={isSearchActive} setIsSearchActive={setIsSearchActive}
         isDatePickerOpen={isDatePickerOpen} setIsDatePickerOpen={setIsDatePickerOpen} user={user} isOfflineMode={isOfflineMode}
-        isDarkMode={isDarkMode} toggleTheme={() => setIsDarkMode(!isDarkMode)} setIsSettingsOpen={setIsSettingsOpen}
+        isDarkMode={isDarkMode} toggleTheme={toggleTheme} setIsSettingsOpen={setIsSettingsOpen}
         onLogout={() => { if (isOfflineMode) window.location.reload(); else logOut(); }}
         datePickerRef={datePickerRef} searchInputRef={searchInputRef} isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen}
         deferredPrompt={deferredPrompt}
@@ -864,7 +288,14 @@ const App: React.FC = () => {
               </button>
             ))}
           </div>
-          <div className="flex-1 relative overflow-hidden">{renderContent()}</div>
+          <div className="flex-1 relative overflow-hidden">
+            {isRefreshing && (
+              <div className="absolute top-0 left-0 right-0 flex justify-center p-2 z-10 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
+                <RefreshCw className="animate-spin text-primary-500" size={24} />
+              </div>
+            )}
+            {renderContent()}
+          </div>
         </main>
 
         <aside className={`hidden lg:flex flex-col border-l border-primary-200 dark:border-gray-800 transition-all duration-300 ${isSidebarOpen ? 'w-80' : 'w-0 opacity-0'}`}>
@@ -874,73 +305,35 @@ const App: React.FC = () => {
         <MobileNavigation viewMode={viewMode} setViewMode={setViewMode} onCreateNewTask={() => { setEditingTask({ id: 'temp', title: '', date: format(new Date(), 'yyyy-MM-dd'), time: '08:00', completed: false, tags: ['Khác'] }); setIsEditModalOpen(true); }} onOpenSettings={() => setIsSettingsOpen(true)} onOpenAI={() => setIsAIOpen(true)} />
       </div>
 
-      <AiAssistant tasks={tasks} externalOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />
-
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        telegramConfig={telegramConfig}
-        tags={tags}
+      <ModalsContainer
+        tasks={tasks} isAIOpen={isAIOpen} setIsAIOpen={setIsAIOpen}
+        isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen}
+        telegramConfig={telegramConfig} tags={tags}
         onSaveConfig={(cfg) => {
           setTelegramConfig(cfg);
           localStorage.setItem('telegramConfig', JSON.stringify(cfg));
-          // Save to Firestore when updating
           if (user && useFirebase) {
             saveTelegramConfigToFirestore(user.uid, cfg);
             showToast("Cấu hình Telegram đã được đồng bộ lên Cloud", "success");
           }
         }}
-        onSaveTags={(t) => setTags(t)}
-        onManualSync={handleManualSync}
-        isSyncing={isSyncing}
-        lastSyncTime={format(new Date(), 'HH:mm')}
-        showToast={showToast}
-        currentTheme={currentTheme}
-        setCurrentTheme={setCurrentTheme}
-        themes={APP_THEMES}
-        fcmConfig={fcmConfig}
-        onFCMChange={setFcmConfig}
-        userId={user?.uid}
-        reminderMinutesBefore={reminderMinutesBefore}
-        onReminderMinutesChange={(minutes) => {
+        onSaveTags={(t) => setTags(t)} handleManualSync={handleManualSync}
+        isSyncing={isSyncing} lastSyncTime={format(new Date(), 'HH:mm')} showToast={showToast}
+        currentTheme={currentTheme} setCurrentTheme={setCurrentTheme} themes={APP_THEMES}
+        fcmConfig={fcmConfig} setFcmConfig={setFcmConfig} userId={user?.uid}
+        reminderMinutesBefore={reminderMinutesBefore} setReminderMinutesBefore={(minutes) => {
           setReminderMinutesBefore(minutes);
           localStorage.setItem('reminder_minutes_before', minutes.toString());
         }}
-      />
-
-      <EditTaskModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} task={editingTask} tags={tags} onSave={async (t) => { if (t.id === 'temp') await handleRequestAddTask(t); else await handleUpdateTask(t); setIsEditModalOpen(false); }} showToast={showToast} />
-
-      <ConfirmModal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={executeDeleteTask} title="Xác nhận" message="Bạn có chắc muốn xóa không?" />
-
-      {/* AI Conflict Modal (This stays as requested) */}
-      <ConflictWarningModal
-        isOpen={isConflictModalOpen}
-        onClose={() => setIsConflictModalOpen(false)}
-        onConfirm={() => {
-          if (proposedTask) {
-            saveTaskToDatabase(proposedTask);
-            setProposedTask(null);
-          }
-        }}
-        conflicts={pendingConflicts}
-        taskTitle={proposedTask?.title || ""}
-      />
-
-      {/* Reminder Modal */}
-      <ReminderModal
-        isOpen={isReminderModalOpen}
-        task={reminderTask}
-        tags={tags}
-        onClose={handleReminderClose}
-        onSnooze={handleReminderSnooze}
-        onMarkComplete={handleReminderComplete}
-      />
-
-      {/* Onboarding Modal */}
-      <OnboardingModal
-        isOpen={showOnboarding && !!user}
-        onClose={closeOnboarding}
-        onOpenSettings={() => { closeOnboarding(); setIsSettingsOpen(true); }}
+        isEditModalOpen={isEditModalOpen} setIsEditModalOpen={setIsEditModalOpen}
+        editingTask={editingTask} handleRequestAddTask={handleRequestAddTask} handleUpdateTask={handleUpdateTask}
+        isDeleteModalOpen={isDeleteModalOpen} setIsDeleteModalOpen={setIsDeleteModalOpen}
+        executeDeleteTask={executeDeleteTask} taskToDeleteId={taskToDeleteId}
+        isConflictModalOpen={isConflictModalOpen} setIsConflictModalOpen={setIsConflictModalOpen}
+        saveTaskToDatabase={saveTaskToDatabase} proposedTask={proposedTask} setProposedTask={setProposedTask} pendingConflicts={pendingConflicts}
+        isReminderModalOpen={isReminderModalOpen} reminderTask={reminderTask} handleReminderClose={handleReminderClose}
+        handleReminderSnooze={handleReminderSnooze} handleReminderComplete={handleReminderComplete}
+        showOnboarding={showOnboarding} user={user} closeOnboarding={closeOnboarding}
       />
     </div>
   );

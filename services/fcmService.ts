@@ -79,9 +79,16 @@ export const requestFCMPermission = async (): Promise<string | null> => {
       return null;
     }
 
-    // Get FCM token
-    const currentToken = await getToken(messaging, { 
-      vapidKey: VAPID_KEY 
+    // Wait for the existing service worker to be ready
+    let swRegistration = null;
+    if ('serviceWorker' in navigator) {
+      swRegistration = await navigator.serviceWorker.ready;
+    }
+
+    // Get FCM token using the specific service worker registration
+    const currentToken = await getToken(messaging, {
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: swRegistration || undefined
     });
 
     if (currentToken) {
@@ -138,7 +145,7 @@ export const unregisterFCMToken = async (): Promise<boolean> => {
   try {
     const messaging = await getMessagingInstance();
     if (!messaging) return false;
-    
+
     await deleteToken(messaging);
     console.log("Đã hủy đăng ký FCM token");
     return true;
@@ -153,8 +160,8 @@ export const unregisterFCMToken = async (): Promise<boolean> => {
  */
 export const onForegroundMessage = (callback: (payload: any) => void): (() => void) => {
   // Return empty function first, then setup async
-  let unsubscribe: (() => void) = () => {};
-  
+  let unsubscribe: (() => void) = () => { };
+
   getMessagingInstance().then((messaging) => {
     if (messaging) {
       unsubscribe = onMessage(messaging, (payload) => {
@@ -195,7 +202,7 @@ export const initializeFCM = async (userId: string): Promise<FCMConfig> => {
       await saveFCMTokenToFirestore(userId, token);
       return { enabled: true, token };
     }
-    
+
     return { enabled: false, token: null };
   } catch (error) {
     console.error("Lỗi khởi tạo FCM:", error);

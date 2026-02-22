@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { TelegramConfig, Tag, COLOR_PALETTES, AppTheme } from '../types';
-import { X, Save, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Palette, Bell, BellOff, Key, Sparkles, AlarmClock } from 'lucide-react';
+import { X, Save, MessageSquare, RefreshCw, Clock, Tag as TagIcon, Plus, Trash2, ChevronDown, Palette, Bell, BellOff, Key, Sparkles, AlarmClock, AlertTriangle, LogOut } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 import { ToastType } from './Toast';
 import { checkFCMSupport, initializeFCM, disableFCM, FCMConfig } from '../services/fcmService';
 import { saveGeminiApiKey, hasGeminiApiKey } from '../services/geminiService';
+import { deleteUserAccountAndData, logOut } from '../services/firebase';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -80,8 +81,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Reminder Minutes State
   const [localReminderMinutes, setLocalReminderMinutes] = useState<number>(reminderMinutesBefore);
 
-  // State cho Modal xác nhận xóa
+  // State cho Modal xác nhận xóa thẻ
   const [tagToDelete, setTagToDelete] = useState<string | null>(null);
+
+  // State Delete Account
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   useEffect(() => {
     setConfig(telegramConfig);
@@ -193,6 +199,32 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       showToast("Lỗi khi thay đổi cài đặt thông báo", "error");
     } finally {
       setIsFCMLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'XOA') {
+      showToast("Vui lòng nhập đúng chữ XOA để xác nhận", "warning");
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      await deleteUserAccountAndData();
+      showToast("Đã xóa tài khoản và toàn bộ dữ liệu thành công.", "success");
+      onClose();
+      // App.tsx sẽ tự chuyển State khi user bị null do onAuthStateChanged
+    } catch (error: any) {
+      console.error(error);
+      if (error.message === 'requires-recent-login') {
+        showToast("Thao tác nhạy cảm. Vui lòng đăng xuất và đăng nhập lại trước khi xóa tài khoản.", "error");
+      } else {
+        showToast("Lỗi khi xóa tài khoản", "error");
+      }
+    } finally {
+      setIsDeletingAccount(false);
+      setShowDeleteConfirm(false);
+      setDeleteConfirmText('');
     }
   };
 
@@ -408,6 +440,72 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   </p>
                 </div>
               </div>
+
+              {/* Danger Zone: Account Deletion */}
+              {userId && (
+                <div className="space-y-4 pt-4 mt-6 border-t border-red-200 dark:border-red-900/50">
+                  <h3 className="text-red-600 dark:text-red-400 font-semibold text-sm flex items-center gap-2">
+                    <AlertTriangle size={16} /> Khu vực nguy hiểm (Danger Zone)
+                  </h3>
+
+                  <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-lg border border-red-200 dark:border-red-900/30">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h4 className="text-xs font-bold text-red-800 dark:text-red-300">Xóa tài khoản vĩnh viễn</h4>
+                        <p className="text-[10px] text-red-600/80 dark:text-red-400/80 mt-1 max-w-[280px]">
+                          Toàn bộ cấu hình, lịch sử công việc và thẻ phân loại của bạn sẽ bị xóa vĩnh viễn khỏi hệ thống không thể khôi phục.
+                        </p>
+                      </div>
+                      {!showDeleteConfirm ? (
+                        <button
+                          onClick={() => setShowDeleteConfirm(true)}
+                          className="px-3 py-1.5 rounded-lg text-[10px] font-bold transition bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 flex items-center gap-1 border border-red-200 dark:border-red-800"
+                        >
+                          <Trash2 size={12} /> Xóa Account
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setShowDeleteConfirm(false);
+                            setDeleteConfirmText('');
+                          }}
+                          className="px-3 py-1 text-[10px] text-gray-500 hover:text-gray-700 transition"
+                        >
+                          Hủy bỏ
+                        </button>
+                      )}
+                    </div>
+
+                    {showDeleteConfirm && (
+                      <div className="mt-4 pt-3 border-t border-red-200 dark:border-red-900/30 animate-in fade-in zoom-in-95 duration-200">
+                        <label className="block text-xs font-medium text-red-700 dark:text-red-400 mb-2">
+                          Để xác nhận, vui lòng nhập chữ <strong className="text-red-800 dark:text-red-300">XOA</strong>
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={deleteConfirmText}
+                            onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
+                            placeholder="XOA"
+                            className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-red-300 dark:border-red-800 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-red-500 outline-none flex-1 font-bold text-center tracking-widest uppercase placeholder:text-gray-300 dark:placeholder:text-gray-600"
+                          />
+                          <button
+                            onClick={handleDeleteAccount}
+                            disabled={deleteConfirmText !== 'XOA' || isDeletingAccount}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center min-w-[100px]
+                              ${deleteConfirmText === 'XOA' && !isDeletingAccount
+                                ? 'bg-red-600 hover:bg-red-700 text-white shadow-md'
+                                : 'bg-red-200 dark:bg-red-900/50 text-red-400 dark:text-red-700 cursor-not-allowed'}
+                            `}
+                          >
+                            {isDeletingAccount ? <RefreshCw size={14} className="animate-spin" /> : 'Chấp nhận xóa'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4 h-full flex flex-col">
