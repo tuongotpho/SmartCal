@@ -128,6 +128,20 @@ export const signInWithEmail = async (email: string, pass: string) => {
   }
 };
 
+export const signUpWithEmail = async (email: string, pass: string, displayName?: string) => {
+  try {
+    const userCredential = await auth.createUserWithEmailAndPassword(email, pass);
+    if (userCredential.user && displayName) {
+      await userCredential.user.updateProfile({
+        displayName: displayName
+      });
+    }
+  } catch (error) {
+    console.error("Email Signup failed", error);
+    throw error;
+  }
+};
+
 export const logOut = async () => {
   try {
     await auth.signOut();

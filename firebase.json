@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "smartcal",
     "public": "dist",
     "ignore": [
       "firebase.json",

@@ -158,13 +158,13 @@ const Sidebar: React.FC<SidebarProps> = ({
     let targetDate = now;
     let targetTime = format(now, "HH:mm");
 
-    const timeRegex = /(?:lúc\s+)?(\d{1,2})[:h](\d{2})?(?:\s*(?:sáng|chiều|tối))?/i;
+    const timeRegex = /(?:lúc\s+)?(\d{1,2})[:h](\d{2})?(?:\s*(?:sáng|chiều|tối|đêm))?/i;
     const timeMatch = text.match(timeRegex);
 
     if (timeMatch) {
       let hours = parseInt(timeMatch[1], 10);
       let minutes = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-      const period = (timeMatch[0].toLowerCase().match(/chiều|tối/) && hours < 12) ? 'pm' : 'am';
+      const period = (timeMatch[0].toLowerCase().match(/chiều|tối|đêm/) && hours < 12) ? 'pm' : 'am';
 
       if (period === 'pm') hours += 12;
       if (hours >= 24) hours = 23;
@@ -173,7 +173,26 @@ const Sidebar: React.FC<SidebarProps> = ({
       targetTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
       text = text.replace(timeMatch[0], "").trim();
     } else {
-      targetTime = "08:00";
+      // Fallback: Kiểm tra xem có từ khóa chung chung không
+      const lowerTextForTime = text.toLowerCase();
+      if (lowerTextForTime.includes("sáng")) {
+        targetTime = "08:00";
+        text = text.replace(/sáng/gi, "").trim();
+      } else if (lowerTextForTime.includes("trưa")) {
+        targetTime = "12:00";
+        text = text.replace(/trưa/gi, "").trim();
+      } else if (lowerTextForTime.includes("chiều")) {
+        targetTime = "14:00";
+        text = text.replace(/chiều/gi, "").trim();
+      } else if (lowerTextForTime.includes("tối")) {
+        targetTime = "19:00";
+        text = text.replace(/tối/gi, "").trim();
+      } else if (lowerTextForTime.includes("đêm")) {
+        targetTime = "22:00";
+        text = text.replace(/đêm/gi, "").trim();
+      } else {
+        targetTime = "08:00";
+      }
     }
 
     const lowerText = text.toLowerCase();

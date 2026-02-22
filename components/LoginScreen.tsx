@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { CheckCircle2, WifiOff, AlertTriangle, Mail, Lock, X, LogIn, ExternalLink, Key } from 'lucide-react';
-import { signInWithGoogle, signInWithEmail, signInWithGoogleToken, isTauri, setGoogleAccessToken } from '../services/firebase';
+import { CheckCircle2, WifiOff, AlertTriangle, Mail, Lock, X, LogIn, ExternalLink, Key, UserPlus } from 'lucide-react';
+import { signInWithGoogle, signInWithEmail, signUpWithEmail, signInWithGoogleToken, isTauri, setGoogleAccessToken } from '../services/firebase';
 
 interface LoginScreenProps {
   onBypassAuth: () => void;
@@ -11,10 +11,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Secret Login State
   const [showSecretLogin, setShowSecretLogin] = useState(false);
+  const [isLoginMode, setIsLoginMode] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
 
   // Tauri Token Login State
   const [showTokenLogin, setShowTokenLogin] = useState(false);
@@ -87,16 +88,28 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
     }
   };
 
-  const handleSecretLogin = async (e: React.FormEvent) => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
 
     setIsLoading(true);
     setError(null);
     try {
-      await signInWithEmail(email, password);
+      if (isLoginMode) {
+        await signInWithEmail(email, password);
+      } else {
+        await signUpWithEmail(email, password, displayName);
+      }
     } catch (err: any) {
-      setError("Tài khoản hoặc mật khẩu không đúng.");
+      if (err.code === 'auth/email-already-in-use') {
+        setError("Email này đã được sử dụng.");
+      } else if (err.code === 'auth/weak-password') {
+        setError("Mật khẩu quá yếu (cần ít nhất 6 ký tự).");
+      } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError("Tài khoản hoặc mật khẩu không đúng.");
+      } else {
+        setError(isLoginMode ? "Đăng nhập thất bại." : "Đăng ký thất bại.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -126,11 +139,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
         <div className="text-left space-y-3 mb-8 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <CheckCircle2 size={16} className="text-green-500" />
-            {/* THE SECRET TRIGGER: No cursor pointer, no hover effect */}
-            <span
-              onClick={() => setShowSecretLogin(true)}
-              className="cursor-default select-none"
-            >
+            <span className="cursor-default select-none">
               Đồng bộ dữ liệu trên mọi thiết bị
             </span>
           </div>
@@ -203,9 +212,109 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
             </div>
           )}
 
-          <div className="relative flex py-1 items-center">
+          {!showSecretLogin ? (
+            <>
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+                <span className="flex-shrink-0 mx-2 text-gray-400 text-xs">hoặc</span>
+                <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowSecretLogin(true);
+                  setIsLoginMode(true);
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-800/30 font-medium py-3 px-4 rounded-xl transition-all shadow-sm hover:shadow-md active:scale-95 text-sm"
+              >
+                <Mail size={18} />
+                Đăng nhập / Đăng ký bằng Email
+              </button>
+            </>
+          ) : (
+            <div className="mt-4 p-5 bg-white dark:bg-gray-800 rounded-xl border border-orange-100 dark:border-gray-700 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-bold text-gray-800 dark:text-white">
+                  {isLoginMode ? 'Đăng nhập bằng Email' : 'Đăng ký Tài khoản'}
+                </h2>
+                <button
+                  onClick={() => { setShowSecretLogin(false); setError(null); }}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-full p-1"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <form onSubmit={handleEmailAuth} className="space-y-3">
+                {!isLoginMode && (
+                  <div className="relative">
+                    <UserPlus size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Tên hiển thị (VD: Nguyễn Sang)"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      required
+                    />
+                  </div>
+                )}
+                <div className="relative">
+                  <Mail size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    required
+                  />
+                </div>
+                <div className="relative">
+                  <Lock size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 rounded-lg transition flex items-center justify-center gap-2"
+                >
+                  {isLoading ? (
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  ) : isLoginMode ? (
+                    <LogIn size={18} />
+                  ) : (
+                    <UserPlus size={18} />
+                  )}
+                  {isLoginMode ? 'Đăng nhập' : 'Đăng ký'}
+                </button>
+              </form>
+
+              <div className="mt-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLoginMode(!isLoginMode);
+                    setError(null);
+                  }}
+                  className="text-xs font-medium text-orange-600 hover:text-orange-700 dark:text-orange-500 dark:hover:text-orange-400 transition"
+                >
+                  {isLoginMode ? 'Chưa có tài khoản? Đăng ký ngay' : 'Đã có tài khoản? Đăng nhập'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="relative flex py-1 items-center mt-3">
             <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
-            <span className="flex-shrink-0 mx-2 text-gray-400 text-xs">hoặc</span>
+            <span className="flex-shrink-0 mx-2 text-gray-400 text-xs">hoặc sử dụng không cần tài khoản</span>
             <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
           </div>
 
@@ -269,53 +378,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onBypassAuth }) => {
                   🌐 Đóng và vào Web App
                 </button>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* Secret Login Modal */}
-        {showSecretLogin && (
-          <div className="absolute inset-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-2xl animate-in fade-in duration-200">
-            <button
-              onClick={() => { setShowSecretLogin(false); setError(null); }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-            >
-              <X size={24} />
-            </button>
-            <div className="w-full max-w-xs p-4">
-              <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-6">Admin Login</h2>
-              <form onSubmit={handleSecretLogin} className="space-y-4">
-                <div className="relative">
-                  <Mail size={18} className="absolute left-3 top-2.5 text-gray-400" />
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    required
-                  />
-                </div>
-                <div className="relative">
-                  <Lock size={18} className="absolute left-3 top-2.5 text-gray-400" />
-                  <input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    required
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 rounded-lg transition flex items-center justify-center gap-2"
-                >
-                  {isLoading ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> : <LogIn size={18} />}
-                  Đăng nhập
-                </button>
-              </form>
             </div>
           </div>
         )}

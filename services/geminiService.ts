@@ -76,11 +76,11 @@ export const parseTaskWithGemini = async (input: string, availableTags: string[]
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Phân tích: "${input}". Hôm nay: ${today}. 
+      contents: `Phân tích: "${input}". Hôm nay: ${today}.
       Yêu cầu:
       1. Xác định TẤT CẢ các sự kiện riêng biệt. Ví dụ: "Thứ 2 làm A, thứ 3 làm B" -> 2 sự kiện.
       2. Nếu không rõ ngày, mặc định là hôm nay.
-      3. Nếu không rõ giờ, mặc định 08:00.
+      3. Nếu không rõ giờ, mặc định 08:00. Chú ý các từ chỉ thời gian: "Sáng" (~08:00), "Trưa" (~12:00), "Chiều" (~14:00 hoặc 15:00), "Tối" (~19:00 - 20:00), "Đêm" (~22:00). Nếu trong câu có nhắc đến "chiều", "chieu" thì MUST gán giờ là 14:00 hoặc 15:00.
       4. Trả về JSON ARRAY (Kể cả chỉ có 1 sự kiện).
       
       Output JSON Schema: Array<{ title: string, date: string (YYYY-MM-DD), time: string (HH:mm), endDate: string, duration: string, description: string, recurringType: string, tags: string[] }>

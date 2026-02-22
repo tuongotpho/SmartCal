@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'smartcal-cache-v1';
+const CACHE_NAME = 'smartcal-cache-v6';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -40,12 +40,12 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   // Bỏ qua các request non-GET hoặc chrome-extension
   if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) {
-      return;
+    return;
   }
 
   // Với API Firebase/Gemini, ta ưu tiên mạng (Network First)
   if (event.request.url.includes('firebase') || event.request.url.includes('googleapis')) {
-      return;
+    return;
   }
 
   event.respondWith(
@@ -53,16 +53,16 @@ self.addEventListener('fetch', event => {
       .then(cachedResponse => {
         // Return cached response if valid
         const fetchPromise = fetch(event.request).then(
-           networkResponse => {
-             // Cập nhật cache nếu mạng OK
-             if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-                const responseToCache = networkResponse.clone();
-                caches.open(CACHE_NAME).then(cache => {
-                   cache.put(event.request, responseToCache);
-                });
-             }
-             return networkResponse;
-           }
+          networkResponse => {
+            // Cập nhật cache nếu mạng OK
+            if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+              const responseToCache = networkResponse.clone();
+              caches.open(CACHE_NAME).then(cache => {
+                cache.put(event.request, responseToCache);
+              });
+            }
+            return networkResponse;
+          }
         );
         return cachedResponse || fetchPromise;
       })
