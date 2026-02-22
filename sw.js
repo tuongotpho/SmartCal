@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'smartcal-cache-v6';
+const CACHE_NAME = 'smartcal-cache-v8';
 const urlsToCache = [
   '/',
   '/index.html',

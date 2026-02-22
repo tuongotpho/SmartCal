@@ -50,6 +50,7 @@ import KanbanView from './components/KanbanView';
 import TimelineView from './components/TimelineView';
 import FocusView from './components/FocusView';
 import ReminderModal from './components/ReminderModal';
+import OnboardingModal from './components/OnboardingModal';
 
 import { Task, TelegramConfig, ViewMode, Tag, DEFAULT_TASK_TAGS, RecurringType, AppTheme, AppNotification } from './types';
 import { parseTaskWithGemini, generateReport, checkProposedTaskConflict } from './services/geminiService';
@@ -143,6 +144,16 @@ const App: React.FC = () => {
   // Reminder Modal State
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   const [reminderTask, setReminderTask] = useState<Task | null>(null);
+
+  // Onboarding State
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    return localStorage.getItem('hasSeenOnboarding') !== 'true';
+  });
+
+  const closeOnboarding = useCallback(() => {
+    setShowOnboarding(false);
+    localStorage.setItem('hasSeenOnboarding', 'true');
+  }, []);
 
   // Reminder Settings (thời gian nhắc trước, mặc định 60 phút)
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState<number>(() => {
@@ -923,6 +934,13 @@ const App: React.FC = () => {
         onClose={handleReminderClose}
         onSnooze={handleReminderSnooze}
         onMarkComplete={handleReminderComplete}
+      />
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        isOpen={showOnboarding && !!user}
+        onClose={closeOnboarding}
+        onOpenSettings={() => { closeOnboarding(); setIsSettingsOpen(true); }}
       />
     </div>
   );
