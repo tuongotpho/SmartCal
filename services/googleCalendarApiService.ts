@@ -1,5 +1,6 @@
 import { Task } from '../types';
 import { getGoogleAccessToken } from './firebase';
+import { getLunarAnniversarySolar } from './lunarService';
 
 const GOOGLE_CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
 
@@ -14,21 +15,62 @@ interface GoogleEvent {
         dateTime: string;
         timeZone: string;
     };
+    recurrence?: string[];
     id?: string;
     htmlLink?: string;
 }
 
-const buildEventFromTask = (task: Task): GoogleEvent => {
-    // Parsing thời gian từ task (ví dụ: task.date="2023-12-01", task.time="14:30")
-    const startTime = new Date(`${task.date}T${task.time}:00`);
+/**
+ * Map ngày trong tuần (JS 0=CN) sang RRULE BYDAY
+ */
+const BYDAY_MAP: Record<number, string> = {
+    0: 'SU', 1: 'MO', 2: 'TU', 3: 'WE', 4: 'TH', 5: 'FR', 6: 'SA'
+};
 
-    // Tạm thời mặc định sự kiện kéo dài 1 tiếng
+/**
+ * Build RRULE cho sự kiện Dương lịch lặp lại
+ */
+const buildRRule = (task: Task): string[] | undefined => {
+    const recType = task.recurringType || 'none';
+    if (recType === 'none') return undefined;
+
+    // Không dùng RRULE cho sự kiện Âm lịch (xử lý riêng bằng multi-event)
+    if (task.isLunarDate) return undefined;
+
+    const startDate = new Date(`${task.date}T${task.time || '00:00'}:00`);
+
+    switch (recType) {
+        case 'daily':
+            return ['RRULE:FREQ=DAILY'];
+        case 'weekly': {
+            const dayOfWeek = BYDAY_MAP[startDate.getDay()];
+            return [`RRULE:FREQ=WEEKLY;BYDAY=${dayOfWeek}`];
+        }
+        case 'monthly': {
+            const dayOfMonth = startDate.getDate();
+            return [`RRULE:FREQ=MONTHLY;BYMONTHDAY=${dayOfMonth}`];
+        }
+        case 'yearly': {
+            const month = startDate.getMonth() + 1;
+            const day = startDate.getDate();
+            return [`RRULE:FREQ=YEARLY;BYMONTH=${month};BYMONTHDAY=${day}`];
+        }
+        default:
+            return undefined;
+    }
+};
+
+const buildEventFromTask = (task: Task, overrideDate?: string): GoogleEvent => {
+    const dateStr = overrideDate || task.date;
+    const startTime = new Date(`${dateStr}T${task.time || '00:00'}:00`);
+
+    // Mặc định sự kiện kéo dài 1 tiếng
     const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
 
     // Lấy timezone hiện tại của trình duyệt
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-    return {
+    const event: GoogleEvent = {
         summary: task.title,
         description: task.description || "",
         start: {
@@ -40,14 +82,78 @@ const buildEventFromTask = (task: Task): GoogleEvent => {
             timeZone
         }
     };
+
+    // Thêm RRULE cho sự kiện Dương lịch lặp lại
+    const recurrence = buildRRule(task);
+    if (recurrence && !overrideDate) {
+        event.recurrence = recurrence;
+    }
+
+    return event;
 };
 
+/**
+ * Tạo event mới trên Google Calendar.
+ * - Dương lịch lặp lại: 1 event + RRULE
+ * - Âm lịch lặp lại: tạo 10 event riêng lẻ cho 10 năm tới
+ */
 export const addEventToGoogleCalendarAPI = async (task: Task): Promise<GoogleEvent | null> => {
     const token = getGoogleAccessToken();
     if (!token) {
         throw new Error('missing_token');
     }
 
+    // --- ÂM LỊCH LẶP LẠI: Tạo 10 event riêng lẻ ---
+    if (task.isLunarDate && task.lunarDay && task.lunarMonth &&
+        (task.recurringType === 'yearly' || task.recurringType === 'monthly')) {
+
+        const YEARS_AHEAD = 10;
+        const currentYear = new Date(task.date).getFullYear();
+        let firstEvent: GoogleEvent | null = null;
+
+        for (let i = 0; i < YEARS_AHEAD; i++) {
+            const targetYear = currentYear + i;
+            try {
+                const solarDate = getLunarAnniversarySolar(task.lunarDay, task.lunarMonth, targetYear);
+                if (solarDate.day === 0) continue;
+
+                const dateStr = `${solarDate.year}-${String(solarDate.month).padStart(2, '0')}-${String(solarDate.day).padStart(2, '0')}`;
+
+                // Thêm ghi chú Âm lịch vào mô tả
+                const lunarDesc = `📅 Âm lịch: ${task.lunarDay}/${task.lunarMonth} (${targetYear})\n${task.description || ''}`;
+                const lunarTask = { ...task, description: lunarDesc.trim() };
+                const eventData = buildEventFromTask(lunarTask, dateStr);
+
+                const response = await fetch(GOOGLE_CALENDAR_API_BASE, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(eventData)
+                });
+
+                if (response.status === 401 || response.status === 403) {
+                    throw new Error('unauthorized');
+                }
+
+                if (response.ok) {
+                    const data: GoogleEvent = await response.json();
+                    if (i === 0) firstEvent = data; // Lưu event đầu tiên
+                    console.log(`GCal Lunar Event created: ${dateStr} (${task.lunarDay}/${task.lunarMonth} Âm năm ${targetYear})`);
+                } else {
+                    console.warn(`GCal Lunar Event failed for ${targetYear}:`, await response.text());
+                }
+            } catch (error: any) {
+                if (error.message === 'unauthorized' || error.message === 'missing_token') throw error;
+                console.warn(`Lunar event creation failed for year ${targetYear}:`, error);
+            }
+        }
+
+        return firstEvent;
+    }
+
+    // --- DƯƠNG LỊCH (CÓ HOẶC KHÔNG LẶP LẠI): 1 event (kèm RRULE nếu lặp) ---
     const eventData = buildEventFromTask(task);
 
     try {
