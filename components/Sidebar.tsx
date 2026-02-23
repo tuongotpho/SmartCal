@@ -22,7 +22,7 @@ import { lunarToSolar, solarToLunar } from '../services/lunarService';
 
 interface SidebarProps {
   onAddTask: (task: Task) => Promise<void>;
-  onGenerateReport: () => void;
+  onGenerateReport: (range: 'today' | 'week' | 'month') => void;
   isReportLoading: boolean;
   aiReport: string | null;
   tags: Tag[];
@@ -43,6 +43,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   isDarkMode,
   showToast
 }) => {
+  const [reportRange, setReportRange] = useState<'today' | 'week' | 'month'>('month');
   const [sidebarTab, setSidebarTab] = useState<'ai' | 'manual'>('manual');
 
   // Quick Input State
@@ -561,8 +562,20 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       <div className="p-4 border-b border-primary-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex-shrink-0">
+        <div className="flex items-center gap-2 mb-3">
+          <select
+            value={reportRange}
+            onChange={(e) => setReportRange(e.target.value as any)}
+            disabled={isReportLoading}
+            className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-500"
+          >
+            <option value="today">Hôm nay</option>
+            <option value="week">Tuần này</option>
+            <option value="month">Tháng này</option>
+          </select>
+        </div>
         <button
-          onClick={onGenerateReport}
+          onClick={() => onGenerateReport(reportRange)}
           disabled={isReportLoading}
           className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-2 rounded-lg hover:shadow-lg transition font-medium text-sm active:scale-95"
         >
@@ -575,7 +588,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {aiReport && (
           <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-lg border border-indigo-100 dark:border-indigo-800 text-gray-700 dark:text-gray-300 animate-in fade-in slide-in-from-top-2 shadow-sm">
             <div className="font-bold text-indigo-800 dark:text-indigo-300 mb-2 flex items-center gap-1 border-b border-indigo-200 dark:border-indigo-800 pb-1 text-sm">
-              <Bot size={14} /> Báo cáo AI:
+              <Bot size={14} /> Báo cáo AI {reportRange === 'today' ? '(Hôm nay)' : reportRange === 'week' ? '(Tuần này)' : '(Tháng này)'}:
             </div>
             <div
               className="text-xs leading-relaxed space-y-2 [&>h4]:font-bold [&>h4]:text-indigo-700 dark:[&>h4]:text-indigo-400 [&>h4]:mt-2 [&>h4]:mb-1 [&>ul]:list-disc [&>ul]:pl-4 [&>ul]:space-y-1 [&>p]:mb-1"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { format, addMonths } from 'date-fns';
+import { format, addMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { RefreshCw, Timer } from 'lucide-react';
 
 import CalendarView from './components/CalendarView';
@@ -268,7 +268,44 @@ const App: React.FC = () => {
         </main>
 
         <aside className={`hidden lg:flex flex-col border-l border-primary-200 dark:border-gray-800 transition-all duration-300 ${isSidebarOpen ? 'w-80' : 'w-0 opacity-0'}`}>
-          <Sidebar onAddTask={handleRequestAddTask} onGenerateReport={() => { setIsReportLoading(true); generateReport(tasks, "Tháng").then(r => { setAiReport(r); setIsReportLoading(false); }); }} isReportLoading={isReportLoading} aiReport={aiReport} tags={tags} user={user} isOfflineMode={isOfflineMode} isDarkMode={isDarkMode} showToast={showToast} />
+          <Sidebar
+            onAddTask={handleRequestAddTask}
+            onGenerateReport={(range) => {
+              setIsReportLoading(true);
+
+              const now = new Date();
+              let startDate: Date;
+              let endDate: Date;
+              let rangeLabel = "Của bạn";
+
+              if (range === 'today') {
+                startDate = now;
+                endDate = now;
+                rangeLabel = "Hôm nay";
+              } else if (range === 'week') {
+                startDate = startOfWeek(now, { weekStartsOn: 1 });
+                endDate = endOfWeek(now, { weekStartsOn: 1 });
+                rangeLabel = "Tuần này";
+              } else {
+                startDate = startOfMonth(now);
+                endDate = endOfMonth(now);
+                rangeLabel = "Tháng này";
+              }
+
+              const formattedStart = format(startDate, 'yyyy-MM-dd');
+              const formattedEnd = format(endDate, 'yyyy-MM-dd');
+
+              const filteredTasksForReport = tasks.filter(t => {
+                return t.date >= formattedStart && t.date <= formattedEnd;
+              });
+
+              generateReport(filteredTasksForReport, rangeLabel).then(r => {
+                setAiReport(r);
+                setIsReportLoading(false);
+              });
+            }}
+            isReportLoading={isReportLoading} aiReport={aiReport} tags={tags} user={user} isOfflineMode={isOfflineMode} isDarkMode={isDarkMode} showToast={showToast}
+          />
         </aside>
 
         <MobileNavigation viewMode={viewMode} setViewMode={setViewMode} onCreateNewTask={() => { setEditingTask({ id: 'temp', title: '', date: format(new Date(), 'yyyy-MM-dd'), time: '08:00', completed: false, tags: ['Khác'] }); setIsEditModalOpen(true); }} onOpenSettings={() => setIsSettingsOpen(true)} onOpenAI={() => setIsAIOpen(true)} />
