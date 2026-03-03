@@ -235,9 +235,20 @@ export const generateReport = async (tasks: Task[], range: string): Promise<stri
 
   try {
     const tasksData = tasks.map(t => ({ title: t.title, date: t.date, status: t.completed ? "Xong" : "Chưa" }));
+
+    const prompt = `Bạn là một Trợ lý năng suất AI chuyên nghiệp. Dưới đây là danh sách công việc của tôi trong: ${range}. Dữ liệu dạng JSON: ${JSON.stringify(tasksData)}.
+
+YÊU CẦU:
+1. Tuyệt đối KHÔNG liệt kê lại từng công việc một cách nhàm chán.
+2. ĐÁNH GIÁ tổng quan năng suất (hoàn thành bao nhiêu, còn tồn đọng bao nhiêu, xu hướng công việc là gì).
+3. NHẬN XÉT về hiệu quả làm việc và CẢNH BÁO nếu có quá nhiều việc mệt mỏi hoặc lịch bị dồn ứ.
+4. Đưa ra 1-2 LỜI KHUYÊN thiết thực giúp tôi xử lý các việc "Chưa" hoàn thành hoặc quản lý thời gian tốt hơn.
+5. Giọng điệu gần gũi, khích lệ và thông minh.
+6. Format đầu ra hoàn toàn bằng mã HTML gọn gàng (h4, p, ul, li, b, i) có sử dụng emoji sinh động.`;
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Báo cáo năng suất ${range}: ${JSON.stringify(tasksData)}. Trả về HTML (h4, ul, li).`
+      contents: prompt
     });
     return response.text || "";
   } catch (error) {

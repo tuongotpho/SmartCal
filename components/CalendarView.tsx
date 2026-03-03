@@ -179,7 +179,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                   // Trong chế độ xem Ngày, không cần hiển thị ở đây vì đã có tiêu đề lớn
                   <div></div>
                 ) : (
-                  <span className={`text-[10px] leading-none mt-1 ml-0.5 ${isLunarFirst ? 'text-red-400 font-bold' : 'text-gray-300 dark:text-gray-500'}`}>
+                  <span className={`text-[15px] leading-none flex items-center justify-center rounded-full w-6 h-6 sm:w-7 sm:h-7 ${isLunarFirst ? 'text-red-600 font-bold bg-red-100 dark:text-red-400 dark:bg-red-900/50' : 'text-gray-900 dark:text-gray-200 bg-gray-100 dark:bg-gray-700/50'}`}>
                     {lunarDisplay}
                   </span>
                 )}
@@ -196,7 +196,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                       </span>
                     </div>
                   ) : (
-                    <span className={`text-xs sm:text-sm font-semibold sm:p-1 ${isToday(day) ? 'bg-orange-500 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center shadow-md' : ''}`}>
+                    <span className={`text-base sm:text-xl font-semibold sm:p-1 ${isToday(day) ? 'bg-orange-500 text-white rounded-full w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center shadow-md' : ''}`}>
                       {format(day, dateFormat)}
                     </span>
                   )}
